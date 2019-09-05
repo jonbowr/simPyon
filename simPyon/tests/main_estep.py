@@ -10,7 +10,7 @@ from matplotlib import style
 # style.use('seaborn-whitegrid')
 import random as rand
 from simPyon import gem
-from simPyon import simion as sim
+import simPyon as sim
 import simPyon as sp
 
 def volt_dict_pm_adj(volt_dict,pos_scale=1,neg_scale=1):
