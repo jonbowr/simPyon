@@ -3,7 +3,7 @@ from scipy.optimize import curve_fit as cf
 from scipy import stats
 import math
 from matplotlib import pyplot as plt
-from simPyon.defaults import *
+from ..defaults import *
 
 def log_starts(ion_num):
     start_loc = np.ones(len(ion_num)).astype(bool)
@@ -113,9 +113,9 @@ class sim_data:
                 log_starts(self.df['ion n'])][goot])
         return(sim_data(self.data[~good_ions]))
 
-    def show(self,hist_bins = 50):
+    def show(self,hist_bins = 50,variables = ['tof','ke','x','r','theta','phi']):
         fig, axs = plt.subplots(3,2)
-        for ax,var in zip(axs.reshape(axs.size,1)[:,0],['tof','ke','x','r','theta','phi']):
+        for ax,var in zip(axs.reshape(axs.size,1)[:,0],variables):
             ax.hist(self()[var],hist_bins,weights = self()['counts'],alpha = .4)
             ax.set_xlabel(var)
             ax.set_ylabel('counts')

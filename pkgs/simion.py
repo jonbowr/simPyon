@@ -8,10 +8,10 @@ from scipy.optimize import curve_fit as cf
 from scipy import stats
 import math
 from matplotlib import pyplot as plt
-from simPyon import gem
-from simPyon.particles import auto_parts
-from simPyon.data import sim_data
-from simPyon.defaults import *
+from . import gem
+from .particles import auto_parts
+from .data import sim_data
+from ..defaults import *
 
 class simion:
     def __init__(self,volt_dict = {}, pa=[], gemfil=[]):
@@ -233,7 +233,7 @@ class simion:
                       7:1.93775}):
         data = []
         for step in e_steps:
-            self.volt_adj_dict(volt_base_dict,
+            self.fast_adjust(volt_base_dict,
                     scale_fact = volt_scale_factors[step])
             data.append(self.fly(n_parts = n_parts).data)
         return(data)

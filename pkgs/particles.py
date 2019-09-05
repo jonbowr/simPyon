@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import stats
 import math
-from simPyon.defaults import *
+from ..defaults import *
 
 class sim_parts:
 
@@ -178,6 +178,10 @@ class source:
 class auto_parts:
     
     def __init__(self, fil='auto_ion.ion', n=10000):
+        # from ..defaults import KE_DIST_TYPE,KE_DIST_VALS,\
+        #         AZ_DIST_TYPE,AZ_DIST_VALS,EL_DIST_TYPE,\
+        #         EL_DIST_VALS,POS_DIST_TYPE,POS_DIST_VALS,\
+        #         MASS,CHARGE
 
         self.n = n
         self.mass = MASS
@@ -185,17 +189,17 @@ class auto_parts:
         self.fil = fil
 
         # distribution defaults
-        self.ke = source(KE_DIST_TYPE,n)
-        self.ke.dist_vals = KE_DIST_VALS
+        self.ke = source(str(KE_DIST_TYPE),n)
+        self.ke.dist_vals = KE_DIST_VALS.copy()
 
-        self.az = source(AZ_DIST_TYPE,n)
-        self.az.dist_vals = AZ_DIST_VALS
+        self.az = source(str(AZ_DIST_TYPE),n)
+        self.az.dist_vals = AZ_DIST_VALS.copy()
         
-        self.el = source(EL_DIST_TYPE,n)
-        self.el.dist_vals= EL_DIST_VALS
+        self.el = source(str(EL_DIST_TYPE),n)
+        self.el.dist_vals= EL_DIST_VALS.copy()
 
-        self.pos = source(POS_DIST_TYPE,n)
-        self.pos.dist_vals = POS_DIST_VALS
+        self.pos = source(str(POS_DIST_TYPE),n)
+        self.pos.dist_vals = POS_DIST_VALS.copy()
 
     def __call__(self):
         return({'n':self.n,

@@ -42,7 +42,7 @@ R_MIN = 35.4
 
 # Use the impact angle to help more accurately determine
 #	observability at ToF
-TOF_MEASURE = True
+TOF_MEASURE = False
 
 #==========================================================
 # Weight the particle counts by their distance from the 

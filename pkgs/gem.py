@@ -9,7 +9,7 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 from mpl_toolkits import mplot3d
 import time
-from simPyon import fig_measure as meat
+from . import fig_measure as meat
 from matplotlib import style
 # style.use('default')
 # import plotly as pltly
