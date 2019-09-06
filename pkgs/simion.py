@@ -246,3 +246,22 @@ class simion:
             np.save(input('File Name to Save to: '),volts)
         self.volt_dict = volts
         return(volts)
+
+    def get_master_volts(self,volt_dict = []):
+        if volt_dict ==[]:
+            volt_dict = self.volt_dict
+        self.master_volts = {}
+        for elec_num in self.elect_dict:
+            self.master_volts[elec_num] = volt_dict[self.elect_dict[elec_num]]
+        for elec_name in volt_dict:
+            self.master_volts[elec_name] = volt_dict[elec_name]
+        return(self.master_volts)
+
+    def scale_volts(self,volt_dict,scale_fact):
+        m_volts = self.get_master_volts(volt_dict)
+        s_volts = {}
+        for num,nam in self.elect_dict.items():
+            s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
+        return(self.get_master_volts(s_volts))
+
+    # def check_volts()

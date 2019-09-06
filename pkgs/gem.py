@@ -5,6 +5,8 @@ from skimage import feature
 from skimage import measure
 from matplotlib import pyplot as plt
 from matplotlib import widgets
+from shapely.geometry import Polygon as spoly
+from shapely.geometry import MultiPolygon as mpoly
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 from mpl_toolkits import mplot3d
@@ -356,127 +358,17 @@ def gem_draw(gem_file, canvas = [],pxls_mm = None):
     return(~np.transpose(canvas))
 
 
-def field_calc(gem_file, volts):
-    with open(gem_file) as lines:
-        file_lines = lines.readlines()
-
-    reloc = []
-    new_lines = ['']*len(file_lines)
-
-    i = 0
-    # clean the file of comments,spaces and black lines
-    for line in file_lines:
-        line = line[:line.find(';')].strip('\n').strip(' ')
-        if line != '':
-            if line.find(',') !=-1 and line[-1] ==',':
-                new_lines[i]+=line.strip(' ')
-            else:
-                new_lines[i]+=line.strip(' ')
-                i+=1
-    for line,n in zip(new_lines,range(len(new_lines))):
-        if line == '':
-            del(new_lines[i])
-
-    elec_count = 0
-    # electrodes = []
-    n = 0
-    elec_num = 0
-    pxls_mm = None
-    for line in new_lines:
-        if line != '':
-            if line.lower()[:line.find(';')].find('electrode') != -1:
-                elec_num = int(line[line.find('(')+1:line.find(')')])
-
-        if line.replace(' ','').lower().count('pa_define') != 0:
-            canvas_size = np.fromstring(within(line,'(',',1'),sep =',')[:2].astype(int)  
-            canvas = np.zeros(canvas_size)*np.nan
-        if line.replace(' ','').lower().count('locate(') != 0 and pxls_mm == None:
-            pxls_mm = np.fromstring(within(line,'(',')'),sep =',')[-1]
-
-        if line.replace(' ','').lower().count('fill') != 0 and line.replace(' ','').lower().count('rotate_fill') == 0:
-            electrode = np.zeros(canvas.shape)*np.nan
-            # identify the position in x,y of the locate call
-            
-            op_brac = line[line.lower().find('fill'):].count('{')
-            close_brac = 0
-            m = 0
-            print(volts[elec_num])
-            while op_brac > close_brac or op_brac == 0:
-                sub_line = new_lines[n+m]       
-                op_brac = op_brac + sub_line.count('{')
-                close_brac = close_brac + sub_line.count('}')
-                if draw_style(sub_line) == 'in':
-                    electrode[draw_from_gem(sub_line,canvas.shape,pxls_mm)] = volts[elec_num]
-                elif draw_style(sub_line) == 'not_in':
-                    electrode[draw_from_gem(sub_line,canvas.shape,pxls_mm)] = np.nan
-                # if draw_style(sub_line) == 'in':
-                #     electrodes[elec_count] += draw_from_gem(sub_line,canvas.shape,pxls_mm)
-                # elif draw_style(sub_line) == 'not_in':
-                #     electrodes[elec_count][draw_from_gem(sub_line,canvas.shape,pxls_mm)] = False
-                    # np.logical_or(electrodes[elec_count],
-                    #                 ~draw_shapes(sub_line,canvas.shape,pxls_mm))
-                m += 1
-            not_nan = ~np.isnan(electrode)
-            canvas[not_nan] = electrode[not_nan]
-            elec_count += 1
-        n += 1
-
-    # for elec in electrodes:
-    #     canvas = np.logical_or(canvas,elec)
-    plt.imshow(np.transpose(canvas),origin = 'lower')
-    plt.show()
-    return(np.transpose(canvas))
-
 def gem_draw_poly(gem_file,measure = False,annotate = False,elec_names = []):
-    with open(gem_file) as lines:
-        file_lines = lines.readlines()
-
-    reloc = []
-    new_lines = ['']*len(file_lines)
-
-    i = 0
-    # clean the file of comments,spaces and black lines
-    for line in file_lines:
-        line = line[:line.find(';')].strip('\n').strip(' ')
-        if line != '':
-            if line.find(',') !=-1 and line[-1] ==',':
-                new_lines[i]+=line.strip(' ')
-            else:
-                new_lines[i]+=line.strip(' ')
-                i+=1
-    for line,n in zip(new_lines,range(len(new_lines))):
-        if line == '':
-            del(new_lines[i])
-
-    elec_count = 0
-    n = 0
+    elec_verts,exclude_verts = get_verts(gem_file)
     electrodes = {}
-    excludes = []
-    num = 0
-    for line in new_lines:
-        if line != '':
-            if line.lower()[:line.find(';')].find('electrode') != -1:
-                num = int(line[line.find('(')+1:line.find(')')])
-                if num not in electrodes:
-                    electrodes[num] = []
-        if line.replace(' ','').lower().count('fill') != 0 and line.replace(' ','').lower().count('rotate_fill') == 0:
-            # print(num)
-            op_brac = line[line.lower().find('fill'):].count('{')
-            close_brac = 0
-            m = 0
-            while op_brac > close_brac or op_brac == 0:
-                sub_line = new_lines[n+m]       
-                op_brac = op_brac + sub_line.count('{')
-                close_brac = close_brac + sub_line.count('}')
-                if draw_style(sub_line) == 'in':
-                    if com_type(sub_line) == 'polyline' or com_type(sub_line) == 'box':
-                        electrodes[num] += [Polygon(get_vtex(sub_line))]
-                elif draw_style(sub_line) == 'not_in':
-                    if com_type(sub_line) == 'polyline' or com_type(sub_line) == 'box':
-                        excludes.append(Polygon(get_vtex(sub_line),color = 'white'))
-                m += 1
-            elec_count += 1
-        n += 1
+    excludes = {}
+    for nam in elec_verts:
+        electrodes[nam] = []
+        excludes[nam] = []
+        for part in elec_verts[nam]:
+            electrodes[nam].append(Polygon(part))
+        for ex in exclude_verts[nam]:
+            excludes[nam].append(Polygon(ex,color = 'white'))
     patches = []
     keys = []
 
@@ -504,8 +396,9 @@ def gem_draw_poly(gem_file,measure = False,annotate = False,elec_names = []):
                 ax.annotate(elec_names[nam],loc,ha= 'center',bbox = bbox_props)
     ax.autoscale(enable = True)
     ax.autoscale(enable = False)
-    for clip in excludes:
-        ax.add_patch(clip)
+    for nam in excludes:
+        for clip in excludes[nam]:
+            ax.add_patch(clip)
     
     ax.set_aspect('equal')
     # fig.colorbar(p,ax=ax)
@@ -519,6 +412,80 @@ def gem_draw_poly(gem_file,measure = False,annotate = False,elec_names = []):
         measur.connect()
     return(fig,ax)
 
+
+
+def get_verts(gem_file):
+    with open(gem_file) as lines:
+        file_lines = lines.readlines()
+
+    reloc = []
+    new_lines = ['']*len(file_lines)
+
+    i = 0
+    # clean the file of comments,spaces and black lines
+    for line in file_lines:
+        line = line[:line.find(';')].strip('\n').strip(' ')
+        if line != '':
+            if line.find(',') !=-1 and line[-1] ==',':
+                new_lines[i]+=line.strip(' ')
+            else:
+                new_lines[i]+=line.strip(' ')
+                i+=1
+    for line,n in zip(new_lines,range(len(new_lines))):
+        if line == '':
+            del(new_lines[i])
+
+    elec_count = 0
+    n = 0
+    electrodes = {}
+    excludes = {}
+    num = 0
+    for line in new_lines:
+        if line != '':
+            if line.lower()[:line.find(';')].find('electrode') != -1:
+                num = int(line[line.find('(')+1:line.find(')')])
+                if num not in electrodes:
+                    electrodes[num] = []
+                    excludes[num] = []
+        if line.replace(' ','').lower().count('fill') != 0 and line.replace(' ','').lower().count('rotate_fill') == 0:
+            # print(num)
+            op_brac = line[line.lower().find('fill'):].count('{')
+            close_brac = 0
+            m = 0
+            while op_brac > close_brac or op_brac == 0:
+                sub_line = new_lines[n+m]       
+                op_brac = op_brac + sub_line.count('{')
+                close_brac = close_brac + sub_line.count('}')
+                if draw_style(sub_line) == 'in':
+                    if com_type(sub_line) == 'polyline' or com_type(sub_line) == 'box':
+                        electrodes[num].append(get_vtex(sub_line))
+                elif draw_style(sub_line) == 'not_in':
+                    if com_type(sub_line) == 'polyline' or com_type(sub_line) == 'box':
+                        excludes[num].append(get_vtex(sub_line))
+                m += 1
+            elec_count += 1
+        n += 1
+    # using the calculated verts, clip the excludes
+    elec_clip = {}
+    for nam in electrodes:
+        elec_clip[nam] = []
+        elec_poly = []
+        for part in electrodes[nam]:
+            poly_part = spoly([[p[0],p[1]] for p in part])
+            part_max = np.max(part,axis = 0)
+            part_min = np.min(part,axis = 0)
+            for clip in excludes[nam]:
+                clip_poly = spoly([[p[0],p[1]] for p in clip])
+                if poly_part.intersects(clip_poly) ==True:
+                    x,y = clip_poly.exterior.coords.xy
+                    plt.plot(x,y)
+                    poly_part=(poly_part.difference(clip_poly))
+            elec_poly.append(poly_part)
+
+        for ppart in list(mpoly(elec_poly)):
+            x,y = ppart.exterior.coords.xy
+            elec_clip[nam].append(np.stack([x,y]).T)
+    return(elec_clip,excludes)
 
 def gem_draw_3d(gem_file,measure = False):
     with open(gem_file) as lines:
@@ -765,3 +732,47 @@ def gem_vert_chng(shift_gem, out_gem, shift_names, shift_vals):
     with open(out_gem, 'w') as fil_out:
         for line in shift_lines:
             fil_out.write(line)
+
+
+def check_voltage(gemfile,volts):
+    import matplotlib.pylab as pl
+    import matplotlib as mpl
+    elec_verts = get_verts(gemfile)[0]
+    for nam in elec_verts:
+        elec_verts[nam] = np.concatenate(elec_verts[nam],axis = 0)
+
+    elec_check = {}
+    for nam,verts in elec_verts.items():
+
+        elec_check[nam] = {} 
+        elec_check[nam] = [np.concatenate([verts[np.argmin(verts,
+                            axis = 0)],verts[np.argmax(verts,axis = 0)]])]
+        # print(elec_check[nam]['check_pts'])
+        # elec-Vertx|verty|r|
+        elec_check[nam].append([])
+        for pt in elec_check[nam][0]:
+            elec_check[nam][1].append({})
+            for sub_nam,sub_verts in elec_verts.items():
+                if sub_nam != nam:
+                    elec_check[nam][1][-1][sub_nam] = []
+                    r_pt = np.sqrt(np.sum((sub_verts-pt)**2,axis = 1))
+                    elec_check[nam][1][-1][sub_nam].append(min(r_pt))
+                    elec_check[nam][1][-1][sub_nam].append(sub_verts[\
+                                                    np.argmin(r_pt)])
+                    print((volts[nam]-volts[sub_nam])/min(r_pt))
+                    elec_check[nam][1][-1][sub_nam].append(
+                                        (volts[nam]-volts[sub_nam])/min(r_pt))
+                    if elec_check[nam][1][-1][sub_nam][-1]>=1000:
+                        print('\nWARNING: exceeding 1kV/mm between electrodes %s and %s'%(nam,sub_nam))
+                        print('Location:'+str(pt))
+                        print('deltaV = %d'%elec_check[nam][1][-1][sub_nam][-1])
+    gem_draw_poly(gemfile)
+    for nam in elec_check:
+        for pt,n_check in zip(elec_check[nam][0],elec_check[nam][1]):
+            for sub_nam,arr in n_check.items():
+                # mpl.colors.Normalize(vmin = 0,vmax = 1000)
+                if sub_nam<16 and nam<16:
+                    plt.plot([pt[0],arr[1][0]],[pt[1],arr[1][1]],
+                             color = pl.cm.plasma(arr[-1]/1000))
+    return(elec_check)
+
