@@ -14,31 +14,29 @@ from .data import sim_data
 from ..defaults import *
 
 class simion:
-    def __init__(self,volt_dict = {}, pa=[], gemfil=[]):
+    def __init__(self,volt_dict = {},home = './'):
         self.commands = []
+        self.home = home
         self.sim = r'simion.exe --nogui --noprompt --default-num-particles=100000 '
         self.elec_num = []
-        self.pa = pa
-        self.gemfil = gemfil
+        self.pa = []
+        self.gemfil = []
         self.elect_dict = {}
         self.volt_dict = {}
         self.data = []
         self.parts = auto_parts()
-        for file in os.listdir('./'):
+        for file in os.listdir(home):
                 if file.endswith(".iob"):
-                    self.bench = file
-        if pa == []:            
-            for root,dirs,files in os.walk('./'):
-                for file in files:
-                    if file.endswith(".pa0"):
-                        self.pa0 = os.path.join(root,file)
-                    elif file.endswith(".pa#"):
-                        self.pa = os.path.join(root,file).strip('#')
-        else: self.pa0 = pa+'0'
-        if gemfil == []:
-            for file in os.listdir('./'):
-                if file.lower().endswith(".gem"):
-                    self.gemfil = file
+                    self.bench = os.path.join(home,file)
+        for root,dirs,files in os.walk(home):
+            for file in files:
+                if file.endswith(".pa0"):
+                    self.pa0 = os.path.join(root,file)
+                elif file.endswith(".pa#"):
+                    self.pa = os.path.join(root,file).strip('#')
+        for file in os.listdir(home):
+            if file.lower().endswith(".gem"):
+                self.gemfil = os.path.join(home,file)
         self.get_elec_nums_gem()
 
     def gem2pa(self,pa):
@@ -81,7 +79,7 @@ class simion:
         fly_fils = []
         self.parts.n = int(n_parts/cores)
         for i in range(int(cores)):
-            fly_fil = 'auto_fly_%i.ion'%i
+            fly_fil = self.home+'auto_fly_%i.ion'%i
             fly_fils.append(fly_fil)
             self.parts.fil = fly_fil
             self.parts.ion_print()

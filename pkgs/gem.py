@@ -478,7 +478,7 @@ def get_verts(gem_file):
                 clip_poly = spoly([[p[0],p[1]] for p in clip])
                 if poly_part.intersects(clip_poly) ==True:
                     x,y = clip_poly.exterior.coords.xy
-                    plt.plot(x,y)
+                    # plt.plot(x,y)
                     poly_part=(poly_part.difference(clip_poly))
             elec_poly.append(poly_part)
 
