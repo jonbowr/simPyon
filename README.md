@@ -17,6 +17,8 @@ from simPyon import *
 - NumPy
 - SciPy
 - Matplotlib
+- multiprocessing
+- subpprocess
 
 ### Adding SIMION to PATH
 Aside from having an updated version of Python 3 and SIMION installed, SIMION needs to be added to PATH so that it is accessable to  windows CMD. 
@@ -31,6 +33,8 @@ With the SIMION folder added to path you should be able to boot SIMION straight 
 > simion
 ``` 
 Make sure not to reassign that system variable, it will break this package. 
+
+## Running SIMION
 
 ### Initializing simPyon Environment
 simPyon functions best from quasi-3D geometry builds constructed using the SIMION gem language, described [here](https://simion.com/info/gem_geometry_file.html). This package can function fine with any of the other geometry creation methods, but the geomerty visualization and fast-adjusting tools rely on the .gem file, so most of the functionality here requires gem usage. 
@@ -75,18 +79,42 @@ In [1]:sim.fast_adjust()
 ``` 
 The Lua output will be printed to the commandline, unless you set quiet=True. It is a good idea to make sure from the output text that the fast adjust succeeded, you can run into problems if the potential array is open in another program, so make sure no other instances of SIMION are running. 
 ### Flying particles
+Probably the most important SIMION command supported by this package is the fly functionality. This package parrallelized the fly function by opening an SIMION instances on each core and flying a subgroup of the total number of particles in each instance, the output from each core is collected once all cores have returned. Unfortunatly, the particle distributions must be set from inside this package, SIMION's handleing of random numbers is such that repeated fly commands whith the same particle sources will simply repeat the exact same calculation on each core, effectively making the paralleization pointless. So the default particle sources from inside SIMION cannot be used. 
 
+A discussion reguarding setting the particles sources is takes place below. With the particle distributions set, to fly 10000 particles, you simply use:
+```python
+In [1]:sim.fly(n_parts = 10000)
+``` 
+**It should be noted that this defaults to use the total number of cores available and will grab 100% of the available processing power, so keep an eye on system temp if your system doesn't control that well. You can manually set the number of cores in the fly command by just using ```sim.fly(cores = NUMBER_OF_DESIRED_CORES)```.
+
+### Setting the particle distribution
+The particle distributions are handled using the ```python simPyon.particles.source``` class, which defines the randomly selected values for the particle's:
+- mass: Mass in amu (int)
+- charge: elementry charge (int)
+- ke: Kinetic energy [ev] (float)
+- az: Velocity vector elevation angle [deg]. Defined from the x-z axis perpendicular from the axis of rotation
+- el: Velocity vector elevation angle [deg]. Defined from the x axis in the axis of rotation
+- pos: Position [mm]
+The source distributions can be changed in two ways; 
+1) editing the default values defined in ```simPyon/defaults.py```. Whenever a simPyon environment is initialized, these values will automatically assigned to the particles distributions. 
+2) Actively changeing the simPyon particle distribution.
 ## Supported Particle Source Distributions
+- Gaussian
+- Uniform
+- Line
+- Single
+- Sputtered
+- Cos
+
+## Returned Data structure
 
 ##  Examples
-```Python
-Check This Example
-```
+Example Python script showing the functionality can bee seen in ```simPyon/examples/sim_init.py```. This script needs to be copied to a folder containg a simion workplace to function. 
 
 ## Versioning 
 
 ## Authors
-- Jonathan Bower
+- Jonathan Bower, Research Scientist II, EOS Space Science Center, University of New Hamphire, Durham NH
 
 ## License
 
