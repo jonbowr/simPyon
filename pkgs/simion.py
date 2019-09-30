@@ -22,7 +22,7 @@ class simion:
         self.pa = []
         self.gemfil = []
         self.elect_dict = {}
-        self.volt_dict = {}
+        self.volt_dict = volt_dict
         self.data = []
         self.parts = auto_parts()
         for file in os.listdir(home):
@@ -55,13 +55,18 @@ class simion:
         self.commands = "fastadj %s %s" % (self.pa0, fast_adj_str[:-1])
         self.run(quiet = quiet)
 
-    def fast_adjust(self,elec_dict = [],scale_fact = 1,quiet = False):
-        if elec_dict == []:
-            elec_dict = self.volt_dict
-        dict_out = dict([(elec,elec_dict[elec]) for elec in elec_dict])
+    def fast_adjust(self,volt_dict = [],scale_fact = 1,quiet = False):
+
+        if volt_dict == []:
+            volt_dict = self.volt_dict
+        elif type(volt_dict) == dict: 
+                self.volt_dict = volt_dict
+        dict_out = dict([(elec,volt_dict[elec]) for elec in volt_dict])
         # print(dict_out)
-        volts = [elec_dict[self.elect_dict[val]]*\
+        volts = [volt_dict[self.elect_dict[val]]*\
         (scale_fact if val < 16 else 1) for val in self.elec_num]
+        # self.volt_dict = dict(volt_dict[self.elect_dict[val]]*\
+        # (scale_fact if val < 16 else 1) for val in self.elec_num)
         # print(volts)
         if quiet == False:
             for val in self.elec_num:
@@ -73,7 +78,10 @@ class simion:
         return(self)  
 
     def fly(self,n_parts = 1000,
-        cores = multiprocessing.cpu_count(),surpress_output = False):
+        cores = multiprocessing.cpu_count(),surpress_output = False,
+        fast_adj = True):
+        if fast_adj == True and self.volt_dict!={}:
+            self.fast_adjust(quiet = True)
         start_time = time.time()
         checks = []
         fly_fils = []
@@ -220,8 +228,8 @@ class simion:
                 x = np.linspace(-x_min,x_min,100)
                 ax2.plot(x,circ(r,x), color = 'r')
 
-    def fly_steps(self,volt_base_dict,n_parts = 10000,
-        e_steps = np.arange(1,8),
+    def fly_steps(self,n_parts = 10000,volt_base_dict={},
+        e_steps = np.arange(1,8),e_max = 1000,
         volt_scale_factors = {1:.034735,
                       2:81.2/1212,
                       3:156/1212,
@@ -230,10 +238,16 @@ class simion:
                       6:1,
                       7:1.93775}):
         data = []
+        # upper_eng = np.copy(self.parts.ke.dist_vals['max'])
         for step in e_steps:
-            self.fast_adjust(volt_base_dict,
-                    scale_fact = volt_scale_factors[step])
-            data.append(self.fly(n_parts = n_parts).data)
+            if volt_base_dict != {}:
+                self.fast_adjust(volt_base_dict,
+                        scale_fact = volt_scale_factors[step])
+            else:
+                self.fast_adjust(scale_fact = volt_scale_factors[step])
+            self.parts.ke.dist_vals['max'] = \
+                    e_max*volt_scale_factors[step]
+            data.append(self.fly(n_parts = n_parts,fast_adj = False).data)
         return(data)
 
     def define_volts(self, save = False):
@@ -260,6 +274,6 @@ class simion:
         s_volts = {}
         for num,nam in self.elect_dict.items():
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
-        return(self.get_master_volts(s_volts))
+        return(s_volts)
 
     # def check_volts()

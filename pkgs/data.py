@@ -121,9 +121,10 @@ class sim_data:
             ax.set_ylabel('counts')
         plt.tight_layout()
 
-    def e_res(self,norm = None):
+    def e_res(self,norm = None,label = '',plot = True):
         return(gauss_fit(self.good().start()()['ke'],
-            weights = self.good().start()()['counts'],norm = norm)[0])
+            weights = self.good().start()()['counts'],norm = norm,
+            label = label,plot = plot))
 
     def de_e(self):
         return(np.std(self.good().start()()['ke'])/\
@@ -156,9 +157,6 @@ def gauss_fit(data,title = '', plot = True,n_tot = [],weights = None,label='',no
         n_tot = len(data)
     bin_e,bin_edges=np.histogram(data,bins=np.linspace(0,rng,50),density=False,weights = weights)
     err = np.sqrt(bin_e)
-    if norm == 'peak':
-        err = bin_e/max(bin_e)*np.sqrt(1/bin_e+1/np.max(bin_e))
-        bin_e = bin_e/max(bin_e)
 
     bin_mid=(bin_edges[1:]+bin_edges[:-1])/2
     gauss_param=cf(gauss,bin_mid,bin_e,(max(bin_e),np.average(bin_mid,weights=bin_e),
@@ -170,7 +168,14 @@ def gauss_fit(data,title = '', plot = True,n_tot = [],weights = None,label='',no
     width = abs(gauss_param[2]*2*np.sqrt(2*np.log(2)))
     width_locs = gauss_param[1]+np.array((-width/2,width/2))
     
-
+    if norm == 'peak':
+        gauss_fit=gauss(ex,gauss_param[0],gauss_param[1],gauss_param[2])/max(bin_e) 
+        err = bin_e/max(bin_e)*np.sqrt(1/bin_e+1/np.max(bin_e))
+        bin_e = bin_e/max(bin_e) 
+    if type(norm) != str and norm != None:
+        bin_e = bin_e/norm
+        err = err/norm
+        gauss_fit=gauss(ex,gauss_param[0],gauss_param[1],gauss_param[2])/norm
     if plot == True:
         print('\nFit parmameters: '+title)
         print('[       a                x0              sigma     ]')

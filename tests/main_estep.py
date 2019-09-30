@@ -10,8 +10,8 @@ from matplotlib import style
 # style.use('seaborn-whitegrid')
 import random as rand
 from ..pkgs import gem
-from ..pkgs import simPyon as sim
-import simPyon as sp
+# from ..pkgs import simion as sim
+import simPyon as sim
 
 def volt_dict_pm_adj(volt_dict,pos_scale=1,neg_scale=1):
     out_dict = {}
@@ -47,7 +47,7 @@ def main_e_steps(volt_base_dict,pa_nam = [],gem_nam = [],n_parts = 10000):
                   6:1,
                   7:1.93775}
     IMAP_base_scale = 1.0679
-    coms = sim.simion(pa = pa_nam,gemfil = gem_nam)
+    coms = sim.simion()
     data = []
     for step in range(1,8):
         coms.volt_adj_dict(volt_base_dict,scale_fact = scale_fact[step])
@@ -83,17 +83,17 @@ def fly_steps(volt_base_dict,sim,n_parts = 10000,e_steps = np.arange(1,8)):
     return(data)
 
 
-def main_eng_band_change(volt_dict,pa_nam=[],gem_nam=[],
+def eng_band_change(volt_dict,pa_nam=[],gem_nam=[],
     scales = np.linspace(.8,1.2,5),n_parts = 10000,E_max = 1000,de_e = 1,e=330):
     data = []
-    coms = sim.simion(pa = pa_nam,gemfil = gem_nam)
+    coms = sim.simion()
     # scales = np.linspace(.6,1.4,8)
     for scale in scales:
-        coms.volt_adj_dict(volt_dict_pm_adj(volt_dict,
+        coms.fast_adjust(volt_dict_pm_adj(volt_dict,
             neg_scale = scale, 
             pos_scale = 1),scale_fact = 1,quiet = True)
         data.append(coms.fly(n_parts = n_parts).data)
-    coms.volt_adj_dict(volt_dict)
+    coms.fast_adjust(volt_dict)
     E = []
     for dat in data:
         # E.append(sim.gauss_fit(dat.good().start().df['ke'],
@@ -107,11 +107,11 @@ def main_eng_band_change(volt_dict,pa_nam=[],gem_nam=[],
     for scale,eng in zip(scales,E):
         # print('=========================================')
         # print(volt_dict)
-        coms.volt_adj_dict(volt_dict_pm_adj(volt_dict,
+        coms.fast_adjust(volt_dict_pm_adj(volt_dict,
             neg_scale = scale, 
             pos_scale = 1),scale_fact = e/eng,quiet = True)
         norm_dat.append(coms.fly(n_parts = n_parts).data)
-    coms.volt_adj_dict(volt_dict)
+    coms.fast_adjust(volt_dict)
     de = []
     for dat in norm_dat:
         # de.append(sim.gauss_fit(dat.good().start().df['ke'],
@@ -131,35 +131,29 @@ def main_eng_band_change(volt_dict,pa_nam=[],gem_nam=[],
         pos_scale = e/poly_eng(scale_out)))
 
 
-def main_eng_band_change_2(volt_dict,scales = np.linspace(.8,1.2,5),
+def eng_band_change_2(volt_dict,scales = np.linspace(.8,1.2,5),
     n_parts = 10000,E_max = 1000,de_e = 1,e=330):
     data = []
-    coms = sim.simion(pa = pa_nam,gemfil = gem_nam)
-    # scales = np.linspace(.6,1.4,8)
+    coms = sim.simion()
+    coms.parts.ke.dist_vals['max'] = E_max
     for scale in scales:
-        coms.volt_adj_dict(volt_dict_pm_adj(volt_dict,
+        coms.fast_adjust(volt_dict_pm_adj(volt_dict,
             neg_scale = scale, 
             pos_scale = 1),scale_fact = 1,quiet = True)
         data.append(coms.fly(n_parts = n_parts).data)
-    coms.volt_adj_dict(volt_dict)
+    coms.fast_adjust(volt_dict)
     E = []
     de = []
     for dat in data:
-        # E.append(sim.gauss_fit(dat.good().start().df['ke'],
-        #     weights = dat.good().start().df['counts'],n_tot = n_parts,plot = False)[0][1])
-        # de.append(2*np.sqrt(2*np.log(2))*np.std(dat.good().start().df['ke'])/\
-        #     np.average(dat.good().start().df['ke'],weights = dat.good().start().df['counts']))
-        de.append(sim.gauss_fit(dat.good().start().df['ke'],
-            weights = dat.good().start().df['counts'],
-            n_tot = n_parts,plot = True)[1])
+        de.append(dat.e_res()[1])
         E.append(np.average(dat.good().start().df['ke'],weights = dat.good().start().df['counts']))
     # plt.plot(np.array(E)/330,1/scales)
     poly_de = np.poly1d(np.polyfit(de,scales,2))
     lin_fit_e_params = np.polyfit(scales,E,1)
-    plt.figure(1)
-    plt.plot(de,scales)
-    plt.figure(2)
-    plt.plot(scales,E)
+    # plt.figure(1)
+    # plt.plot(de,scales)
+    # plt.figure(2)
+    # plt.plot(scales,E)
     # print(lin_fit_e_params)
     poly_eng = np.poly1d(lin_fit_e_params)
     # norm_dat = []
@@ -185,9 +179,10 @@ def main_eng_band_change_2(volt_dict,scales = np.linspace(.8,1.2,5),
     # plt.plot(multi_scales, poly_de(multi_scales))
     # # plt.plot(np.array(E)/330,1/scales)
     scale_out = poly_de(de_e)
-    return(data,volt_dict_pm_adj(volt_dict,
-        neg_scale = scale_out*e/poly_eng(scale_out),
-        pos_scale = e/poly_eng(scale_out)))
+    volt_out = volt_dict_pm_adj(volt_dict_pm_adj(volt_dict,neg_scale = scale_out),
+                                neg_scale  =e/poly_eng(scale_out),
+                                pos_scale = e/poly_eng(scale_out))
+    return(data,volt_out)
 
 
 def main_single_electrode_adj(volt_base_dict,scale_fact,electrodes,
@@ -633,7 +628,7 @@ volt_base_IMAP_dict = {'Conversion Surface':-713.6,
 volt_base_IBEX_dict = {'Conversion Surface':-415,
                     'P2 Electrode':-482,
                     'P3 Electrode': 0,
-                    'Inner ESA':840, #814
+                    'Inner ESA':814, #840
                     'Outter Esa':0,
                     'P9 Electrode':-167,
                     'P10 Electrode':1212,
