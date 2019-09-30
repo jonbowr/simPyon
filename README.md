@@ -88,7 +88,7 @@ In [1]:sim.fly(n_parts = 10000)
 **It should be noted that this defaults to use the total number of cores available and will grab 100% of the available processing power, so keep an eye on system temp if your system doesn't control that well. You can manually set the number of cores in the fly command by just using ```sim.fly(cores = NUMBER_OF_DESIRED_CORES)```.
 
 ### Setting the particle distribution
-The particle distributions are handled using the ```python simPyon.particles.source``` class, which defines the randomly selected values for the particle's:
+The particle distributions are handled using the ```simPyon.particles.source``` class, which defines the randomly selected values for the particle's:
 - mass: Mass in amu (int)
 - charge: elementry charge (int)
 - ke: Kinetic energy [ev] (float)
@@ -104,7 +104,7 @@ The distribution type for each of the particle parameters can be changed by call
 ```python
 In [1]:sim.parts.pos = simPyon.particles.source('gaussian')
 ``` 
-Which changes the distribution type from the default distribution to a gaussian, and assigns new distribution parameter ```python sim.parts.pos.dist_vals```. The distribution parameters can be updated by changing:
+Which changes the distribution type from the default distribution to a gaussian, and assigns new distribution parameter ```sim.parts.pos.dist_vals```. The distribution parameters can be updated by changing:
 ```python
 In [1]:sim.parts.pos.dist_vals['fwhm'] = 100
 ``` 
@@ -117,7 +117,7 @@ In [1]:sim.parts.pos.dist_vals['fwhm'] = 100
 - Sputtered
 - Cos
 
-## Returned Data structure
+## Output Data structure
 
 ##  Examples
 Example Python script showing the functionality can bee seen in ```simPyon/examples/sim_init.py```. This script needs to be copied to a folder containg a simion workplace to function. 
