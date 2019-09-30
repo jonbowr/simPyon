@@ -95,9 +95,20 @@ The particle distributions are handled using the ```python simPyon.particles.sou
 - az: Velocity vector elevation angle [deg]. Defined from the x-z axis perpendicular from the axis of rotation
 - el: Velocity vector elevation angle [deg]. Defined from the x axis in the axis of rotation
 - pos: Position [mm]
-The source distributions can be changed in two ways; 
-1) editing the default values defined in ```simPyon/defaults.py```. Whenever a simPyon environment is initialized, these values will automatically assigned to the particles distributions. 
-2) Actively changeing the simPyon particle distribution.
+
+The souce distribution class, is described by a function name and input parameters. So the ke, might be defined by a gaussian distribution, with a mean values of 100eV and FWHM of 50eV. 
+
+The source distributions can be changed in two ways; 1) editing the default values defined in ```simPyon/defaults.py```. Whenever a simPyon environment is initialized, these values will automatically assigned to the particles distributions. 2) Actively changeing the simPyon particle distribution:
+
+The distribution type for each of the particle parameters can be changed by calling: 
+```python
+In [1]:sim.parts.pos = simPyon.particles.source('gaussian')
+``` 
+Which changes the distribution type from the default distribution to a gaussian, and assigns new distribution parameter ```python sim.parts.pos.dist_vals```. The distribution parameters can be updated by changing:
+```python
+In [1]:sim.parts.pos.dist_vals['fwhm'] = 100
+``` 
+
 ## Supported Particle Source Distributions
 - Gaussian
 - Uniform
