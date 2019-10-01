@@ -126,7 +126,7 @@ Out[4]:
  'cos': {'mean': 75, 'range': 180}}
 ``` 
 The source class handles random sampling the probability distributions through a combination of ```numpy.random```, for numpy supported distributions, and an in house sampling tecnique in defined by the  ```simPyon.particles.pdf``` class. The Currently supported distribution are: 
-- Gaussian: dist_vals={'mean': 0, 'fwhm': 1}
+### Gaussian: dist_vals={'mean': 0, 'fwhm': 1}
   Draw Random samples from a gaussian (normal) distribution. Utilizes [numpy.random.normal]{https://docs.scipy.org/doc/numpy-1.15.0/reference/generated/numpy.random.normal.html} for sampling. 
   The probability density for the gaussian is given by:
   
@@ -134,27 +134,31 @@ The source class handles random sampling the probability distributions through a
   
   with ```\sigma = abs(dist_vals[fwhm]/(2*\sqrt{2*ln(2)}))```
 
-- Uniform: dist_vals={'min': 0, 'max': 1}
+### Uniform: dist_vals={'min': 0, 'max': 1}
   Draw random samples from a flat, uniform distribution, using [numpy.random.uniform]{https://docs.scipy.org/doc/numpy-1.14.0/reference/generated/numpy.random.uniform.html}. Samples between upper and lower bounds of ```[dist_vals[min],dist_vals[max]]```
 
-- Line: dist_vals={'first': array([0, 0, 0]), 'last': array([1, 1, 0])}
+### Line: dist_vals={'first': array([0, 0, 0]), 'last': array([1, 1, 0])}
   Draw random (x,y) position values along a line defined by points ```(dist_vals[first],dist_vals[last])```, where each of the ```first(x,y)``` and ```last(x,y)``` distribution values is defined using their x and y position. The output x_rand values are selected using ```np.random.uniform```, defined between ```[first(x),last(x)]``` and the associated y_rand values is selected using:
   ```
   y_rand(x_rand) = \frac{last(y)-first(y)}{last(x)-first(x)}*x_rand+first(y)
   ```
   
-- Single: dist_vals={'value': 1}
+### Single: dist_vals={'value': 1}
  Returns a single value array of length n, comprised of ```p(x) = dist_vals[value]```
  
-- Sputtered: dist_vals={'E_beam': 105, 'a': 0.01, 'b': 0.65}
+### Sputtered: dist_vals={'E_beam': 105, 'a': 0.01, 'b': 0.65}
   Draws random samples from a probability distribution defined in ```simPyon.particles.pdf.sputtered```, over the range ```[dist_vals[a],dist_vals[b]]```. The distribution shape generated using the approximate shape of the energy distribution of sputtered particles from a 15degree incident angle particle beam of energy ```dist_vales[E_beam]```. The functional approximation for the sputtered particle energy distribution is defined by:
   ```
-  p(x) = [a*x - b*(x-c)**2+ d*np.log(x**(-d)]*dist_vals[E_beam]
+  p(x) = (a*x - b*(x-c)**2+ d*\ln(x**(-d)))*dist_vals[E_beam]
   with a,b,c,d = (-2.12621554, 12.28266708,  0.762046  ,  1.95374093)
   ```
   
-- Cos: dist_vals={'mean': 75, 'range': 180}
-
+### Cos: dist_vals={'mean': 75, 'range': 180}
+Draws random samples from cosine probability distribution defined in ```simPyon.particles.pdf.cos```, over the range ```[dist_vals[mean]-dist_vals[range]/2,dist_vals[mean]+dist_vals[range]/2]```. The probability density for the cos distribution is given by:
+```
+p(x) = cos(x)*dist_vals[range]-dist_vals[range]/2+dist_vals[mean]
+```
+Where x is defined between ```[-\pi/2,\pi/2]```
 
 ## Output Data structure
 
