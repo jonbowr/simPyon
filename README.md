@@ -2,7 +2,7 @@
 Python wrapper for [SIMION](https://simion.com/) ion simulation software. This package was developed at the University of New Hampshire for the purpose of automating a number of simulation processes surrounding SIMION. SIMION has been shown to be an effective and efficient tool to simulate simple electrostatics, that has a low barrier of entry for new scientist looking to try thier hand at instrument development. The purpose of this package is to expand on that goal, and make some of the more advanced simulation processes accessable at a lower level. This package parallelizes ION flight calculations, extracts particle data to numpy data structures, and can be easily used in itterative voltage and geometry refinement and optimization.
 
 ## Getting started
-Once this repository is downloaded, there are a couple steps that need to be taken to get this bad boy up and running. For one, I have not yet set this up as a Python installable, so this repo should be cloned to a folder python tracks, or you will just have to import the file using the file location:
+Once this repository is downloaded, there are a couple steps that need to be taken to get this bad boy up and running. For one, I have not yet set this up as a Python installable, so this repo should be cloned to a folder python tracks, or you will just have to import the package using the file location:
 ```python
 import sys
 sys.path.append(r"C:\YOUR\simPyon\FOLDER\LOCATION\")
@@ -88,7 +88,7 @@ In [1]:sim.fly(n_parts = 10000)
 **It should be noted that this defaults to use the total number of cores available and will grab 100% of the available processing power, so keep an eye on system temp if your system doesn't control that well. You can manually set the number of cores in the fly command by just using ```sim.fly(cores = NUMBER_OF_DESIRED_CORES)```.
 
 ### Setting the particle distribution
-The particle distributions are handled using the ```simPyon.particles.source``` class, which defines the randomly selected values for the particle's:
+The particle distributions are handled using the ```simPyon.particles.source()``` class, which defines the randomly selected values for the particle's:
 - mass: Mass in amu (int)
 - charge: elementry charge (int)
 - ke: Kinetic energy [ev] (float)
@@ -96,26 +96,65 @@ The particle distributions are handled using the ```simPyon.particles.source``` 
 - el: Velocity vector elevation angle [deg]. Defined from the x axis in the axis of rotation
 - pos: Position [mm]
 
-The souce distribution class, is described by a function name and input parameters. So the ke, might be defined by a gaussian distribution, with a mean values of 100eV and FWHM of 50eV. 
+The souce distribution class is constructed using a nested dict, containing the function name and input parameters. So the particle distribution kinetic energy (ke), might be defined by a gaussian distribution, with a mean value of 100eV and FWHM of 50eV ie. ```{'gaussian':{'mean':100,'fwhm':50}}``` 
 
-The source distributions can be changed in two ways; 1) editing the default values defined in ```simPyon/defaults.py```. Whenever a simPyon environment is initialized, these values will automatically assigned to the particles distributions. 2) Actively changeing the simPyon particle distribution:
-
-The distribution type for each of the particle parameters can be changed by calling: 
-```python
-In [1]:sim.parts.pos = simPyon.particles.source('gaussian')
-``` 
-Which changes the distribution type from the default distribution to a gaussian, and assigns new distribution parameter ```sim.parts.pos.dist_vals```. The distribution parameters can be updated by changing:
-```python
-In [1]:sim.parts.pos.dist_vals['fwhm'] = 100
-``` 
-
+The source distributions can be changed in two ways; 
+1) editing the default values defined in ```simPyon/defaults.py```. Whenever a simPyon environment is initialized, these values will automatically assigned to the particles distributions. 
+2) Actively changeing the simPyon particle distribution:
+  The distribution type for each of the particle parameters can be updated by setting it to a new source: 
+  ```python
+  In [1]:sim.parts.pos = simPyon.particles.source('gaussian')
+  ``` 
+  Which changes the distribution type from the default distribution to a gaussian, and assigns new distribution parameters ```sim.parts.pos.dist_vals```. The distribution parameters can be updated by assignment:
+  ```python
+  In [1]:sim.parts.pos.dist_vals['fwhm'] = 100
+  ``` 
+  Which makes the full width half max of the position distribution 100mm. You can print the current settings of the source distribution by calling:
+  ```python
+  In [1]:print(sim.parts())
+  ```
 ## Supported Particle Source Distributions
-- Gaussian
-- Uniform
-- Line
-- Single
-- Sputtered
-- Cos
+Most, but not all of the SIMION supported source distributions are available through simPyon, the modular structure of the source class makes adding new distributions quite simple. The currently supported functions and input parameters can be viewed in the terminal:
+```shell
+In [1]:simPyon.particles.source().defaults
+Out[4]:
+{'gaussian': {'mean': 0, 'fwhm': 1},
+ 'uniform': {'min': 0, 'max': 1},
+ 'line': {'first': array([0, 0, 0]), 'last': array([1, 1, 0])},
+ 'single': {'value': 1},
+ 'sputtered': {'E_beam': 105, 'a': 0.01, 'b': 0.65},
+ 'cos': {'mean': 75, 'range': 180}}
+``` 
+The source class handles random sampling the probability distributions through a combination of ```numpy.random```, for numpy supported distributions, and an in house sampling tecnique in defined by the  ```simPyon.particles.pdf``` class. The Currently supported distribution are: 
+- Gaussian: dist_vals={'mean': 0, 'fwhm': 1}
+  Draw Random samples from a gaussian (normal) distribution. Utilizes [numpy.random.normal]{https://docs.scipy.org/doc/numpy-1.15.0/reference/generated/numpy.random.normal.html} for sampling. 
+  The probability density for the gaussian is given by:
+  
+  ```p(x) = \frac{1}{\sqrt{ 2 \pi \sigma^2 }} e^{ - \frac{ (x - \mu)^2 } {2 \sigma^2} } + dist_vals[mean]```
+  
+  with ```\sigma = abs(dist_vals[fwhm]/(2*\sqrt{2*ln(2)}))```
+
+- Uniform: dist_vals={'min': 0, 'max': 1}
+  Draw random samples from a flat, uniform distribution, using [numpy.random.uniform]{https://docs.scipy.org/doc/numpy-1.14.0/reference/generated/numpy.random.uniform.html}. Samples between upper and lower bounds of ```[dist_vals[min],dist_vals[max]]```
+
+- Line: dist_vals={'first': array([0, 0, 0]), 'last': array([1, 1, 0])}
+  Draw random (x,y) position values along a line defined by points ```(dist_vals[first],dist_vals[last])```, where each of the ```first(x,y)``` and ```last(x,y)``` distribution values is defined using their x and y position. The output x_rand values are selected using ```np.random.uniform```, defined between ```[first(x),last(x)]``` and the associated y_rand values is selected using:
+  ```
+  y_rand(x_rand) = \frac{last(y)-first(y)}{last(x)-first(x)}*x_rand+first(y)
+  ```
+  
+- Single: dist_vals={'value': 1}
+ Returns a single value array of length n, comprised of ```p(x) = dist_vals[value]```
+ 
+- Sputtered: dist_vals={'E_beam': 105, 'a': 0.01, 'b': 0.65}
+  Draws random samples from a probability distribution defined in ```simPyon.particles.pdf.sputtered```, over the range ```[dist_vals[a],dist_vals[b]]```. The distribution shape generated using the approximate shape of the energy distribution of sputtered particles from a 15degree incident angle particle beam of energy ```dist_vales[E_beam]```. The functional approximation for the sputtered particle energy distribution is defined by:
+  ```
+  p(x) = [a*x - b*(x-c)**2+ d*np.log(x**(-d)]*dist_vals[E_beam]
+  with a,b,c,d = (-2.12621554, 12.28266708,  0.762046  ,  1.95374093)
+  ```
+  
+- Cos: dist_vals={'mean': 75, 'range': 180}
+
 
 ## Output Data structure
 
