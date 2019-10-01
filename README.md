@@ -54,6 +54,17 @@ This simply generates a .pa0# file, which is refined to the full potential array
 ```python
 In [1]:sim.refine()
 ```
+### Viewing your geometry
+SimPyon has in house geometry visualization which we generate in pyplot from the vertex information in the gemfile. The geometry can be seen using:
+```shell
+In [1]:sim.show()
+```
+You can also overlay a ruler by setting 
+```python
+In [1]:sim.refine(measure = True)
+```
+After particles have been flown, the particle collision positions will be plotted over the geometry when ```sim.show()``` is called. 
+
 ### Fast Adjust Voltages
 The voltages can be fast adjusted from the python commandline which is easily exploited for looping: fast adjust-->fly-->fast adjust again. If you don't fast adjust, the voltages will just be taken from the last fast adjust, which is stored in the .pa0 file. 
 
@@ -130,7 +141,7 @@ The source class handles random sampling the probability distributions through a
 ```
 dist_vals={'mean': 0, 'fwhm': 1}
 ```
-Draw Random samples from a gaussian (normal) distribution. Utilizes [numpy.random.normal]{https://docs.scipy.org/doc/numpy-1.15.0/reference/generated/numpy.random.normal.html} for sampling. 
+Draw Random samples from a gaussian (normal) distribution. Utilizes [numpy.random.normal](https://docs.scipy.org/doc/numpy-1.15.0/reference/generated/numpy.random.normal.html) for sampling. 
   The probability density for the gaussian is given by:
   
   ```p(x) = \frac{1}{\sqrt{ 2 \pi \sigma^2 }} e^{ - \frac{ (x - \mu)^2 } {2 \sigma^2} } + dist_vals[mean]```
@@ -141,7 +152,7 @@ Draw Random samples from a gaussian (normal) distribution. Utilizes [numpy.rando
 ```
 dist_vals={'min': 0, 'max': 1}
 ```
-Draw random samples from a flat, uniform distribution, using [numpy.random.uniform]{https://docs.scipy.org/doc/numpy-1.14.0/reference/generated/numpy.random.uniform.html}. Samples between upper and lower bounds of ```[dist_vals[min],dist_vals[max]]```
+Draw random samples from a flat, uniform distribution, using [numpy.random.uniform](https://docs.scipy.org/doc/numpy-1.14.0/reference/generated/numpy.random.uniform.html). Samples between upper and lower bounds of ```[dist_vals[min],dist_vals[max]]```
 
 ### Line: 
 ```
@@ -176,9 +187,26 @@ Draws random samples from cosine probability distribution defined in ```simPyon.
 ```
 p(x) = cos(x)*dist_vals[range]-dist_vals[range]/2+dist_vals[mean]
 ```
-Where x is defined between ```[-\pi/2,\pi/2]```
-
+Where x is defined between ```[-1/2 \pi/2,1/2 \pi]```
 ## Output Data structure
+Upon completion of the fly process, the function automatically scrapes the terminal output and returns a ```simPyon.data.sim_data``` data structure, which is also stored in the current simPyon environment as ```sim.data```. The data structure here circomvents the process of storing the SIMION fly data to text and subsequently importing to python. This data structure also automates a number of processes, such as selecting particle that fall within the measurement zone. The measurement zone is defined as a box in the symmetry plane, using the ```X_MAX,X_MIN,R_MAX,R_MIN``` default parameters defined in ```simPyon/defaualts```, they can thus be edited in that file. With those parameters set, you can identify the particles that fall within your measurement zone using:
+```shell
+In [1]:good_data = sim.data.good()
+```
+Select distributions of the good particles can thus be plotted using the command:
+```shell
+In [1]:good_data.show()
+```
+You can return a numpy matrix of the good particles by simply pulling their data:
+```shell
+In [1]:np_data = good_data.data
+```
+With the column lables given by ```good_data.header```. A ditionary data frame of good particles is also available:
+```shell
+In [1]:good_data_frame = good_data.df
+```
+Because this package is aimed at automating simulation exploiting cylindrical symmetry, the data structure automatically computes cylindrical coordinates ```r,theta,phi``` from the SIMION sphirical coordinates.
+
 
 ##  Examples
 Example Python script showing the functionality can bee seen in ```simPyon/examples/sim_init.py```. This script needs to be copied to a folder containg a simion workplace to function. 
