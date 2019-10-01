@@ -217,7 +217,7 @@ Example Python script showing the functionality can bee seen in ```simPyon/examp
 - Jonathan Bower, Research Scientist II, EOS Space Science Center, University of New Hamphire, Durham NH
 
 ## License
-Probably NASA Open Source Agreement (NOSA)? No idea lol 
+This software has been developed for use simulating the IMAP-lo, so Probably NASA Open Source Agreement (NOSA)? 
 
 ## Acknowledgements
 
