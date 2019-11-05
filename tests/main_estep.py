@@ -324,11 +324,11 @@ def main_estep_scan(volt_base_dict,n_parts = 10000,col = None,e_peaks = []):
         plt.legend()
     return(tot_th,tot_e,beams)
 
-def main_voltage_optimize_th(volt_base_dict,electrodes,de_e = 1,de_e_tolerance = .1,
+def voltage_optimize_th(volt_base_dict,electrodes,de_e = 1,de_e_tolerance = .1,
         generations = 15, siblings = 8, mut_w = .1,n_parts = 10000,e = 330):
     np.set_printoptions(precision = 2)
 
-    coms = sim.simion(pa = pa_nam,gemfil = gem_nam)
+    coms = sim.simion()
     volt_shift = dict((name,volt_base_dict[name]) for name in volt_base_dict)
     volt_hold = dict((name,volt_base_dict[name]) for name in volt_base_dict)
     volts_gens = []
@@ -346,8 +346,8 @@ def main_voltage_optimize_th(volt_base_dict,electrodes,de_e = 1,de_e_tolerance =
             for electrode,mut in zip(electrodes,muts):
                 volt_shift[electrode] = volt_hold[electrode]*mut
             volts_siblings.append(dict(volt_shift))
-            coms.volt_adj_dict(volt_shift,scale_fact = 1,quiet = True)
-            coms.fly(n_parts = n_parts,surpress_output = True)
+            coms.fast_adjust(volt_shift,scale_fact = 1,quiet = True)
+            coms.fly(n_parts = n_parts,surpress_output = True,fast_adj=False)
             th_siblings[j] = coms.data.throughput()
             de_e_siblings[j] = np.std(coms.data.good().start()()['ke'])/np.mean(coms.data.good().start()()['ke'])*2.634
             e_siblings[j] = np.mean(coms.data.good().start()()['ke'])
@@ -383,25 +383,33 @@ def main_voltage_optimize_th(volt_base_dict,electrodes,de_e = 1,de_e_tolerance =
             print('-'*len(np.array2string(th_siblings)))
             # volt_hold = volts_siblings[best_child]
     plt.figure(1)
-    plt.plot(np.arange(generations),th_gens,'.-')
+    gens=0
+    for p,th in zip(th_gens, th_tot):
+        for t in th:
+            plt.plot([gens,gens+1],[p,t],'.-',color='r')
+        gens+=1
+    plt.plot(np.arange(generations),th_gens,'.-',color = 'b')
+
     plt.ylabel('Throughput/ $\Delta E/E$')
     plt.xlabel('generation')
     # plt.figure(2)
     # plt.plot(scale_fact,de_e)
     return(th_gens,volts_gens,th_tot)
 
-def main_voltage_optimize(volt_base_dict,electrodes,opt_param_func,
-        constraint_func,opt_func = np.max,
-        generations = 10, siblings = 8, mut_w = .1,n_parts = 10000,e = 330):
+def voltage_optimize(volt_base_dict,electrodes,opt_param_func,
+        constraint_func,opt_func = np.nanmax,
+        generations = 10, siblings = 8, mut_w = .1,n_parts = 10000,
+        walk = False):
     np.set_printoptions(precision = 2)
-    coms = sim.simion(pa = pa_nam,gemfil = gem_nam)
+    coms = sim.simion()
     volt_shift = dict((name,volt_base_dict[name]) for name in volt_base_dict)
     volt_hold = dict((name,volt_base_dict[name]) for name in volt_base_dict)
     volts_gens = []
     param_gens = np.zeros(generations)*np.nan
-    coms.volt_adj_dict(volt_base_dict,quiet = True)
+    coms.fast_adjust(volt_base_dict,quiet = True,keep=True)
     coms.fly(n_parts = n_parts,surpress_output = True)
     param_gens[0] = opt_param_func(coms.data)
+    total_params = []
     print('generation: 0')
     print('[%.2f]'%param_gens[0])
     for i in range(1,generations):
@@ -413,8 +421,8 @@ def main_voltage_optimize(volt_base_dict,electrodes,opt_param_func,
             for electrode,mut in zip(electrodes,muts):
                 volt_shift[electrode] = volt_hold[electrode]*mut
             volts_siblings.append(dict(volt_shift))
-            coms.volt_adj_dict(volt_shift,scale_fact = 1,quiet = True)
-            coms.fly(n_parts = n_parts,surpress_output = True)
+            coms.fast_adjust(volt_shift,scale_fact = 1,quiet = True)
+            coms.fly(n_parts = n_parts,surpress_output = True,fast_adj = False)
             data_siblings.append(coms.data)
             param_siblings[j] = opt_param_func(coms.data)
         print('generation: %d'%i)
@@ -423,7 +431,7 @@ def main_voltage_optimize(volt_base_dict,electrodes,opt_param_func,
         good_volt_sibs = []
         good_param_sibs = []
         for dat,param in zip(data_siblings,param_siblings):
-            if const_func(dat):
+            if constraint_func(dat):
                 good_param_sibs.append(param)
         # for dat,volt,param in zip(data_siblings,volts_siblings,param_siblings):
         #     if const_func(dat): 
@@ -432,23 +440,40 @@ def main_voltage_optimize(volt_base_dict,electrodes,opt_param_func,
         #         good_param_sibs.appen(param)
         if len(good_param_sibs) > 0:
             best_child = np.argwhere(param_siblings == opt_func(good_param_sibs)).reshape(1)[0]
-            if opt_func([opt_func(param_gens),param_siblings[best_child]])==\
-                param_siblings[best_child]:
+            # print(param_siblings[best_child])
+            # print(opt_func(param_gens))
+            if walk ==False:
+                if opt_func([opt_func(param_gens),param_siblings[best_child]])==\
+                    param_siblings[best_child]:
+                    param_gens[i] = param_siblings[best_child]
+                    volts_gens.append(volts_siblings[best_child])
+                    volt_hold = volts_siblings[best_child]
+                    print_loc = ' '*np.array2string(param_siblings).find('%.2f'%param_siblings[best_child])+'  |'
+                    print(print_loc)
+                else:
+                    param_gens[i] = param_gens[i-1]
+                    volts_gens.append(volt_hold)
+                    print('x'*len(np.array2string(param_siblings)))
+            else:
                 param_gens[i] = param_siblings[best_child]
                 volts_gens.append(volts_siblings[best_child])
                 volt_hold = volts_siblings[best_child]
                 print_loc = ' '*np.array2string(param_siblings).find('%.2f'%param_siblings[best_child])+'  |'
                 print(print_loc)
-            else:
-                param_gens[i] = opt_func(param_siblings)
-                volts_gens.append(volt_hold)
-                print('x'*len(np.array2string(param_siblings)))
         else:
-            param_gens[i] = max(param_siblings)
+            param_gens[i] = param_gens[i-1]
             volts_gens.append(volt_hold)
             print('-'*len(np.array2string(param_siblings)))
+        total_params.append(param_siblings)
     plt.figure(1)
-    plt.plot(np.arange(generations),param_gens)
+    gens=0
+    for p,th in zip(param_gens, total_params):
+        for t in th:
+            plt.plot([gens,gens+1],[p,t],'.-',color='r')
+        gens+=1
+    plt.plot(np.arange(generations),param_gens,'.-',color = 'b')
+    plt.ylabel('Throughput/ $\Delta E/E$')
+    plt.xlabel('generation')
     plt.xlabel('generation')
     plt.ylabel(opt_func.__name__+' parameter')
     # plt.figure(2)
