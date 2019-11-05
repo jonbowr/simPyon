@@ -143,7 +143,7 @@ class source:
         return((pdf('cos').sample(n)*self.dist_vals['range']\
             -self.dist_vals['range']/2)+self.dist_vals['mean'])
 
-    def __init__(self,dist_type,n=1):
+    def __init__(self,dist_type='',n=1):
 
         func_dict = {'gaussian':self.gaussian,
                 'uniform':self.uniform,
@@ -159,6 +159,9 @@ class source:
                 'sputtered':{'E_beam':105,'a':.01,'b':.65},
                 'cos':{'mean':75,'range':180}
                 }
+        if dist_type == '':
+            dist_type = 'uniform'
+
         self.defaults = func_defaults
         self.dist_type = dist_type.lower()
         self.f = func_dict[self.dist_type]

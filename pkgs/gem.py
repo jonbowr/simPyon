@@ -358,7 +358,10 @@ def gem_draw(gem_file, canvas = [],pxls_mm = None):
     return(~np.transpose(canvas))
 
 
-def gem_draw_poly(gem_file,measure = False,annotate = False,elec_names = []):
+def gem_draw_poly(gem_file,measure = False,
+                  mark=False,
+                  annotate = False,
+                  elec_names = []):
     elec_verts,exclude_verts = get_verts(gem_file)
     electrodes = {}
     excludes = {}
@@ -381,19 +384,14 @@ def gem_draw_poly(gem_file,measure = False,annotate = False,elec_names = []):
             patches.append(part)
             xy.append(part.get_xy())
         xy = np.concatenate(xy,axis = 0)
-        elec_center[elec] = [np.mean(xy[:,0]),np.max(xy[:,1])]
+        elec_center[elec] = [xy[np.argmin(xy[:,1]),0],
+        xy[np.argmin(xy[:,1]),1]]
+        # np.mean(xy[:,0]),np.max(xy[:,1])]
         
     p = PatchCollection(patches,alpha = 1)
     p.set_array(np.array(keys))
     ax.add_collection(p)
 
-    if annotate ==True:
-        for nam,loc in elec_center.items():
-            bbox_props =dict(boxstyle="round", fc="w", ec="0.5", alpha=0.6)
-            if elec_names ==[]:
-                ax.annotate(nam,loc,ha= 'center')
-            else:
-                ax.annotate(elec_names[nam],loc,ha= 'center',bbox = bbox_props)
     ax.autoscale(enable = True)
     ax.autoscale(enable = False)
     for nam in excludes:
@@ -410,6 +408,19 @@ def gem_draw_poly(gem_file,measure = False,annotate = False,elec_names = []):
         # import fig_measure as meat
         measur = meat.measure(fig,ax)
         measur.connect()
+    elif mark==True:
+        mrk = meat.mark(fig,ax)
+        mrk.connect()
+    elif annotate ==True:
+        numbers = list(elec_center)
+        locations = list(elec_center.values())
+        bbox_props =dict(boxstyle="round", fc="w", ec="0.5", alpha=0.6)
+        if elec_names ==[]:
+            nams = numbers
+        else:
+            nams = [elec_names[num] for num in numbers]
+        lab = meat.label(fig,ax,nams,locations)
+        lab.connect()
     return(fig,ax)
 
 

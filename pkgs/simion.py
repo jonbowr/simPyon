@@ -41,6 +41,7 @@ class simion:
 
     def gem2pa(self,pa):
         self.commands = r"gem2pa %s %s#" % (self.gemfil, pa)
+        self.pa = pa
         self.run()
 
     def refine(self):
@@ -55,7 +56,7 @@ class simion:
         self.commands = "fastadj %s %s" % (self.pa0, fast_adj_str[:-1])
         self.run(quiet = quiet)
 
-    def fast_adjust(self,volt_dict = [],scale_fact = 1,quiet = False):
+    def fast_adjust(self,volt_dict = [],scale_fact = 1,quiet = False,keep = False):
 
         if volt_dict == []:
             volt_dict = self.volt_dict
@@ -65,8 +66,8 @@ class simion:
         # print(dict_out)
         volts = [volt_dict[self.elect_dict[val]]*\
         (scale_fact if val < 16 else 1) for val in self.elec_num]
-        # self.volt_dict = dict(volt_dict[self.elect_dict[val]]*\
-        # (scale_fact if val < 16 else 1) for val in self.elec_num)
+            # self.volt_dict = dict(volt_dict[self.elect_dict[val]]*\
+            # (scale_fact if val < 16 else 1) for val in self.elec_num)
         # print(volts)
         if quiet == False:
             for val in self.elec_num:
@@ -75,13 +76,14 @@ class simion:
         for num,volt in zip(self.elec_num,volts):
             dict_out[self.elect_dict[num]] = volt
         self.volt_adjust(volts,quiet = quiet)
+        if keep:
+            self.volt_dict = dict_out
         return(self)  
 
     def fly(self,n_parts = 1000,
-        cores = multiprocessing.cpu_count(),surpress_output = False,
-        fast_adj = True):
-        if fast_adj == True and self.volt_dict!={}:
-            self.fast_adjust(quiet = True)
+        cores = multiprocessing.cpu_count(),surpress_output = False):
+        # if fast_adj == True and self.volt_dict!={}:
+        #     self.fast_adjust(quiet = True)
         start_time = time.time()
         checks = []
         fly_fils = []
@@ -189,8 +191,9 @@ class simion:
         check.kill()
         return check
     
-    def show(self,measure = False,annotate = False):
+    def show(self,measure = False,mark=False,annotate = False):
         fig,ax1 = gem.gem_draw_poly(self.gemfil,measure = measure,
+                                    mark=mark,
                 annotate = annotate,elec_names = self.elect_dict)
         ax1.set_ylabel('$r=\sqrt{z^2 + y^2}$ [mm]')
         ax1.set_xlabel('x [mm]')
@@ -247,7 +250,7 @@ class simion:
                 self.fast_adjust(scale_fact = volt_scale_factors[step])
             self.parts.ke.dist_vals['max'] = \
                     e_max*volt_scale_factors[step]
-            data.append(self.fly(n_parts = n_parts,fast_adj = False).data)
+            data.append(self.fly(n_parts = n_parts).data)
         return(data)
 
     def define_volts(self, save = False):

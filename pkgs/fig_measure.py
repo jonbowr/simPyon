@@ -1,6 +1,7 @@
 from matplotlib import pyplot as plt
 from matplotlib import patches
 import numpy as np
+from matplotlib.widgets import Button
 
 class img_measure:
 	def __init__(self,img):
@@ -9,8 +10,11 @@ class img_measure:
 		self.ax.imshow(img,origin = 'lower')
 		self.img = img
 		self.pointer_loc = np.zeros(2)
-		self.lines = []
-
+		# self.lines = []
+		# ax_clear = fig.add_subplot([0.7, 0.05, 0.1, 0.075])
+		# ax_clear_all = fig.add_subplot([0.81, 0.05, 0.1, 0.075])
+		# self.clear_butt = Button(ax_clear,'Undo')
+		# self.clear_all_butt = Button(ax_clear_all,'Clear All')
 
 	def connect(self):
 		print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
@@ -324,7 +328,7 @@ class measure:
 						horizontalalignment = 'center',
 						# xytext = (-(6*np.sin(np.degrees(ang))),(6*np.cos(np.degrees(ang)))),
 						xytext = (-dx/abs(dx)*abs(10*dy/L),
-							    dy/abs(dy)*abs(10*dx/L)),
+								dy/abs(dy)*abs(10*dx/L)),
 						textcoords = 'offset pixels')]
 		arc_angs = np.sort([ang,ang-sml_ang*dx/abs(dx)])
 		ang_draw = patches.Arc((self.pointer_loc[0,0],self.pointer_loc[0,1]),
@@ -346,6 +350,175 @@ class measure:
 		plt.close(self.fig)
 		print('We are Disconnected: Press Any key to continue')
 
+
+class mark:
+	def __init__(self,fig,ax):
+		self.fig = fig
+		self.ax = ax
+		self.grab = [False]
+		self.grab_txt = [False]
+		self.pts = []
+		self.pts_info = []
+		self.info_lines = []
+
+	def connect(self):
+		print('Fig Measure connected:\nDouble Click outside Plot to Remove Marks')
+		self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+		self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+		self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+		input('')
+	
+	def onclick(self,event):
+		if plt.get_current_fig_manager().toolbar.mode != '': return
+		if event.ydata != None and event.dblclick == True:
+			self.grab = [False]
+			pt = self.ax.plot(event.xdata,event.ydata,'+',color = 'k')[0]
+			pt_info = self.ax.annotate('(%.1f,%.1f)'%(event.xdata,event.ydata),
+						[event.xdata,event.ydata],
+						xytext = (4,4),textcoords = 'offset pixels')
+			self.pts.append(pt)
+			self.pts_info.append(pt_info)
+			self.info_lines.append(self.ax.plot([event.xdata]*2,
+											   [event.ydata]*2,color = 'gray')[0])
+			self.pointer_loc = np.array([[pt.get_xdata(),
+										pt.get_ydata()] for pt in self.pts])
+			self.fig.canvas.draw()
+			self.fig.canvas.flush_events()
+
+		elif event.dblclick == False and event.ydata != None and event.xdata != None:
+			self.grab = [pt.contains(event)[0] for pt in self.pts]
+			self.grab_txt = [txt.contains(event)[0] for txt in self.pts_info]
+		elif event.dblclick == False and event.ydata==None:
+			self.clear()
+
+	def on_motion(self,event):
+		if any(self.grab):
+			pick_pt = np.argwhere(self.grab)[0][0] 
+			self.pts[pick_pt].set_xdata(event.xdata)
+			self.pts[pick_pt].set_ydata(event.ydata)
+			self.pts_info[pick_pt].remove()
+			self.pts_info[pick_pt] = self.ax.annotate('(%.1f,%.1f)'%(event.xdata,event.ydata),
+						[event.xdata,event.ydata],
+						xytext = (4,4),textcoords = 'offset pixels')
+			self.info_lines[pick_pt].set_xdata([event.xdata]*2)
+			self.info_lines[pick_pt].set_ydata([event.ydata]*2)
+			self.fig.canvas.draw()
+			self.fig.canvas.flush_events()
+		elif any(self.grab_txt):
+			pick_pt =  np.argwhere(self.grab_txt)[0][0] 
+			self.pts_info[pick_pt].remove()
+			dy = event.ydata-self.pts[pick_pt].get_ydata()
+
+			self.pts_info[pick_pt] = self.ax.annotate(\
+						'(%.1f,%.1f)'%(self.pts[pick_pt].get_xdata(),
+										self.pts[pick_pt].get_ydata()),
+						[event.xdata,event.ydata],
+						verticalalignment = 'center',
+						horizontalalignment = 'center',
+						xytext = (0,(6 if dy >= 0 else -6)),textcoords = 'offset pixels')
+			self.info_lines[pick_pt].set_xdata([self.pts[pick_pt].get_xdata(),
+											  event.xdata])
+			self.info_lines[pick_pt].set_ydata([self.pts[pick_pt].get_ydata(),
+											  event.ydata])
+			self.fig.canvas.draw()
+			self.fig.canvas.flush_events()
+
+
+	def on_release(self,event):
+		self.grab = [False]
+		self.grab_txt=[False]
+		
+
+	def clear(self):
+		if len(self.pts)>1:
+			self.pts[-1].remove()
+			del(self.pts[-1])
+
+			self.pts_info[-1].remove()
+			del(self.pts_info[-1])
+			
+			self.info_lines[-1].remove()
+			del(self.info_lines[-1])
+
+			self.fig.canvas.draw()
+			self.fig.canvas.flush_events()
+	def tot_clear(self):
+		for pt,info,line in zip(self.pts,self.pts_info,self.info_lines):
+			pt.remove()
+			info.remove()
+			line.remove()
+		self.pts = []
+		self.pts_info = []
+		self.info_lines = []
+		self.fig.canvas.draw()
+		self.fig.canvas.flush_events()
+
+
+	def disconnect(self):
+		self.fig.canvas.mpl_disconnect(self.cidpress)
+		self.fig.canvas.mpl_disconnect(self.cidrelease)
+		self.fig.canvas.mpl_disconnect(self.cidmotion)
+		plt.close(self.fig)
+		print('We are Disconnected: Press Any key to continue')
+
+
+class label:
+	def __init__(self,fig,ax,names,locs):
+		self.fig = fig
+		self.ax = ax
+		self.grab = [False]
+		self.grab_pt = [False]
+		self.words = []
+		self.lines = []
+		self.points = []
+		self.bbox_props =dict(boxstyle="round", fc="w", ec="0.5", alpha=0.6)
+		for nam,loc in zip(names,locs):
+			self.words.append(self.ax.annotate(nam,loc,ha= 'center',
+											   bbox = self.bbox_props))
+			self.lines.append(self.ax.plot([loc[0]]*2,[loc[1]]*2,color = 'gray')[0])
+			self.points.append(self.ax.plot(loc[0],loc[1],'.',color = 'black')[0])
+
+	def connect(self):
+		print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
+		self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+		self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+		self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+		input('')
+	
+	def onclick(self,event):
+		if plt.get_current_fig_manager().toolbar.mode != '': return
+		
+		self.grab = [word.contains(event)[0] for word in self.words]
+		self.grab_pt = [point.contains(event)[0] for point in self.points]
+		if event.ydata == None and event.dblclick == True:
+			self.disconnect()
+		
+	def on_motion(self,event):
+		if any(self.grab):
+			pick_pt = np.argwhere(self.grab)[0][0]
+			self.words[pick_pt].set_position([event.xdata,event.ydata])
+			self.lines[pick_pt].set_ydata([self.points[pick_pt].get_ydata(),event.ydata])
+			self.lines[pick_pt].set_xdata([self.points[pick_pt].get_xdata(),event.xdata])
+			self.fig.canvas.draw()
+			self.fig.canvas.flush_events()
+		elif any(self.grab_pt):
+			pick_pt = np.argwhere(self.grab_pt)[0][0]
+			self.points[pick_pt].set_xdata(event.xdata)
+			self.points[pick_pt].set_ydata(event.ydata)
+
+			self.lines[pick_pt].set_ydata([self.words[pick_pt].get_position()[1],event.ydata])
+			self.lines[pick_pt].set_xdata([self.words[pick_pt].get_position()[0],event.xdata])
+			self.fig.canvas.draw()
+			self.fig.canvas.flush_events()
+	def on_release(self,event):
+		self.grab = [False]
+		self.grab_pt = [False]
+
+	def disconnect(self):
+		self.fig.canvas.mpl_disconnect(self.cidpress)
+		self.fig.canvas.mpl_disconnect(self.cidrelease)
+		self.fig.canvas.mpl_disconnect(self.cidmotion)
+		print('We are Disconnected: Press Any key to continue')
 
 def img_meat(img):
 	meat_show = measure(img)
