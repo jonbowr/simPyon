@@ -14,6 +14,49 @@ from .data import sim_data
 from ..defaults import *
 
 class simion:
+    '''
+    simion ion simulation environment controler. Utilizes .GEM geometry files to visualize 
+    electrode geometry, generate and refine potential arrays. Allows for voltage fast 
+    adjustment, and particle flying. particle fly_em is parallelized by spawning multiple 
+    simion instances, particle data is output to buffer and imported to numpy array and assigned
+    simPyon.data.simdata data structure rather than saved to disk. 
+
+    performing multiple fly commands overwrite previous data in buffer. 
+
+    Parameters
+    ----------
+    home : string
+        environment location on disk, automatically set to current directory
+    volt_dict : dict
+        dict of floats: {'electrode_name':VOLTAGE} relating the electrode names to desired voltages
+
+    Attributes
+    ----------
+    commands : list of strings 
+        multiple simion commands for cmd to execute
+    home : string
+        environment location on disk, automatically set to current directory
+    sim : string
+        baseline simion execution command, disables simion GUI, surpresses user lua input 
+        (automatically says yes when prompted), and increases the number of particles simion 
+        allows to import from .ion files (from 1000 to 10000)
+    elec_num : list
+        order of electrode numbers as they appear in .GEM
+    pa : string
+        .pa0 file used to fast adjust. simion.__init__ automatically grabs .pa0 file in current directory
+    gemfil : string
+        .GEM file defining geometry. simion.__init__ automatically grabs .pa0 file in current directory
+    elect_dict : dict
+        dict of strings: {ELEC_NUM:'electrode_name'} relating the electrode number to the electrode name. 
+        Electrode name taken from commented string following the electrode declaration in gemfile. 
+            Syntax in .GEM: electrode(1); name_of_electrode_1  
+    volt_dict : dict
+        dict of floats: {'electrode_name':VOLTAGE} relating the electrode names to desired voltages
+    data : simPyon.data.sim_data object
+        ion data output from fly command in simPyon.data.sim_data data structure
+    parts : simPyon.particles.sim_parts object
+        distribution of source particles 
+    '''
     def __init__(self,volt_dict = {},home = './'):
         self.commands = []
         self.home = home
@@ -25,6 +68,8 @@ class simion:
         self.volt_dict = volt_dict
         self.data = []
         self.parts = auto_parts()
+
+        # Grab workbench, potential arrays and gemfiles from current directory
         for file in os.listdir(home):
                 if file.endswith(".iob"):
                     self.bench = os.path.join(home,file)
@@ -40,15 +85,42 @@ class simion:
         self.get_elec_nums_gem()
 
     def gem2pa(self,pa):
+        '''
+        Converts .GEM gemfile defined in self.gemfil to potential array (.pa#) with
+        file name pa. Assigns pa to self.pa
+
+        Parameters
+        ----------
+        pa: string
+            name of newly generated .pa# potential array file
+        '''
         self.commands = r"gem2pa %s %s#" % (self.gemfil, pa)
         self.pa = pa
         self.run()
 
     def refine(self):
+        '''
+        Refines potential array self.pa from .pa# to simions potential array structure
+
+        '''
         self.commands = r"refine %s#" % self.pa
         self.run()
 
     def volt_adjust(self,voltages, quiet = False):
+        '''
+        executes simion command to actually execute fast adjust
+
+        Parameters
+        ----------
+        voltages: array
+            array of voltages connecting desired electrode voltages to electrode number through
+            position in array
+        quiet: bool
+            surpresses lua output to cmd if quiet == True
+
+        ** Needs to be integrated with self.fast_adjust 
+        *** user should use self.fast_adjust to perform fast adjust *** 
+        '''
         fast_adj_str = ''
         for volt, num in zip(voltages, self.elec_num):
             if num != 0:
@@ -56,14 +128,34 @@ class simion:
         self.commands = "fastadj %s %s" % (self.pa0, fast_adj_str[:-1])
         self.run(quiet = quiet)
 
-    def fast_adjust(self,volt_dict = [],scale_fact = 1,quiet = False,keep = False):
+    def fast_adjust(self,volt_dict = [],scale_fact = 1,
+                    quiet = False,keep = False):
+        '''
+        Perform simion fast adjust of potential array .pa0. 
+
+        Allows for relative scaling of all voltages.
+
+        Parameters
+        ----------
+        volt_dict: dict
+            optional input of voltage dict to be used in fast adjust. If no new voltage 
+            is provided fast adjust is performed using voltages in self.volt_dict
+        scale_fact: float
+            optional value to scale all of the electrode voltages to excludes electrodes 
+            with electrode number >=16 from fast adjust. 
+
+            eg: FAST_ADJUST_VOLTAGE = self.volt_dict['electrode_name']*scale_fact
+        quiet: bool
+            surpresses lua output to cmd if quiet == True
+        keep: bool
+            saves new voltages to self. elec_dict if keep == True
+        '''
 
         if volt_dict == []:
             volt_dict = self.volt_dict
         elif type(volt_dict) == dict: 
                 self.volt_dict = volt_dict
         dict_out = dict([(elec,volt_dict[elec]) for elec in volt_dict])
-        # print(dict_out)
         volts = [volt_dict[self.elect_dict[val]]*\
         (scale_fact if val < 16 else 1) for val in self.elec_num]
             # self.volt_dict = dict(volt_dict[self.elect_dict[val]]*\
@@ -82,8 +174,25 @@ class simion:
 
     def fly(self,n_parts = 1000,
         cores = multiprocessing.cpu_count(),surpress_output = False):
-        # if fast_adj == True and self.volt_dict!={}:
-        #     self.fast_adjust(quiet = True)
+        '''
+        Fly n_parts particles using the particle probability distributions defined in self.parts. 
+        Parallelizes the fly processes by spawing a number of instances associated with the
+        number of cores of the processing computer. Resulting particle data is stored in 
+        self.data as a simPyon.data.sim_data object. 
+
+        Parameters
+        ----------
+        n_parts: int
+            number of particles to be flown. n_parts/cores number of particles is flown in each 
+            instance of simion on each core. 
+        cores: int
+            number of cores to use to process the fly particles request. Default initializes 
+            a simion instance to run on each core. 
+        surpress_output: bool
+            With surpress_output == True, the preparation statement from one of the simion 
+            instances is printed to cmd. 
+        '''
+
         start_time = time.time()
         checks = []
         fly_fils = []
@@ -148,6 +257,10 @@ class simion:
         return(self)
 
     def old_fly(self,outfile, bench, particles = [],remove = True):
+        '''
+        Original version of the fly command that uses simion declared particle 
+        distributions to fly
+        '''
         loc_com = r"fly --recording-output="+outfile+\
         r" --retain-trajectories=0 --restore-potentials=0"
         if particles != []:
@@ -163,6 +276,17 @@ class simion:
         print(time.time()-start_time)
 
     def get_elec_nums_gem(self, gem_fil=[]):
+        '''
+        Get the electrode numbers and names from a gemfile and store them in 
+        elec_nums and elec_dict. 
+        
+        Parameters
+        ----------
+        gem_fil: string
+            gemfile to take the names and values from. Default uses the GEM file stored
+            in self.gemfil
+        '''
+
         if gem_fil == []:
             gem_fil = self.gemfil
         lines = open(gem_fil).readlines()
@@ -175,10 +299,10 @@ class simion:
                         self.elect_dict[num] = line[line.find(
                             ';'):].strip(';').strip()
 
-    def electrode_nums(self, nums):
-        self.elec_num = nums
-
     def run(self,quiet = False):
+        '''
+        Executes all of the initialized commands in self.commands
+        '''
         if quiet == False:
             print(self.sim)
             print(self.commands)
@@ -191,10 +315,31 @@ class simion:
         check.kill()
         return check
     
-    def show(self,measure = False,mark=False,annotate = False):
+    def show(self,measure = False,mark=False,annotate = False, origin = [0,0]):
+        '''
+        Plots the geometry stored geometry file by scraping the gemfile for 
+        polygon shape and renders them in pyplot using a collection of patches. 
+
+        Parameters
+        ----------
+        measure: bool
+            With measure == True, displays a dragable ruler, defined by the fig_measure.measure 
+            function, overlaid on the plotted geometry. 
+        mark: bool
+            With mark == True, adds draggable points displaying points the symmetry plane using
+            the fig_measure.mark function. 
+        annotate: bool 
+            With annotate == True, names or numbers of each of the electrodes are overlaid
+            on the plotted geometry using the figmeasure.annote function
+        origin: [0x2] list
+            Point in the simmetry plane to shift the origin to for the displayed geometry. 
+
+        '''
         fig,ax1 = gem.gem_draw_poly(self.gemfil,measure = measure,
                                     mark=mark,
-                annotate = annotate,elec_names = self.elect_dict)
+                                    annotate = annotate,
+                                    elec_names = self.elect_dict,
+                                    origin = origin)
         ax1.set_ylabel('$r=\sqrt{z^2 + y^2}$ [mm]')
         ax1.set_xlabel('x [mm]')
         if self.data != []:
@@ -230,30 +375,61 @@ class simion:
                 x_min =circ(r,min(ybins)) 
                 x = np.linspace(-x_min,x_min,100)
                 ax2.plot(x,circ(r,x), color = 'r')
+        return(fig,ax1)
 
-    def fly_steps(self,n_parts = 10000,volt_base_dict={},
-        e_steps = np.arange(1,8),e_max = 1000,
-        volt_scale_factors = {1:.034735,
-                      2:81.2/1212,
-                      3:156/1212,
-                      4:307/1212,
-                      5:592/1212,
-                      6:1,
-                      7:1.93775}):
+    def fly_steps(self,voltage_scale_factors,n_parts = 10000,e_max = 1000,
+                  volt_base_dict={}):
+        '''
+        Fly particles for a set of voltages generated by scaling stored voltages 
+        to the assigned voltage_scale_factors. Output for each run is stored in data
+        as a list of simPyon.data.sim_data objects. 
+
+        Currently only designed to work with flat energy distributions
+
+        Parameters
+        ----------
+        voltage_scale_factors: array or list
+            List of values to use in the voltage scaling. The default voltages for 
+            each of the electrodes are multiplied by these values before flying
+        n_parts: int
+            number of particles to be flown per fly
+        e_max: float
+            energy values also mutiplied by scale factor to shift distribution in 
+            energy while scaling. 
+        volt_base_dict: dict
+            volt_dict assigning the base voltage setting prior to scaling. 
+        e_steps: 
+        '''
         data = []
         # upper_eng = np.copy(self.parts.ke.dist_vals['max'])
-        for step in e_steps:
+        # volt_scale_factors = {1:.034735,
+        #               2:81.2/1212,
+        #               3:156/1212,
+        #               4:307/1212,
+        #               5:592/1212,
+        #               6:1,
+        #               7:1.93775}
+        for scale in voltage_scale_factors:
             if volt_base_dict != {}:
                 self.fast_adjust(volt_base_dict,
-                        scale_fact = volt_scale_factors[step])
+                        scale_fact = scale)
             else:
-                self.fast_adjust(scale_fact = volt_scale_factors[step])
+                self.fast_adjust(scale_fact = scale)
             self.parts.ke.dist_vals['max'] = \
-                    e_max*volt_scale_factors[step]
+                    e_max*scale
             data.append(self.fly(n_parts = n_parts).data)
         return(data)
 
     def define_volts(self, save = False):
+        '''
+        Prompts user input for electrode voltages
+
+        Parameters
+        ----------
+        save: bool
+            if save == true electrodes are saved to npz file to filename 
+            prompted after volages are input. 
+        '''
         volts = {}
         for elect in self.elect_dict.values():
             volts[elect] = float(input(elect+': '))
@@ -263,6 +439,10 @@ class simion:
         return(volts)
 
     def get_master_volts(self,volt_dict = []):
+        '''
+        Generates master volts dict that links electrode name and number to the 
+        same voltage value. 
+        '''
         if volt_dict ==[]:
             volt_dict = self.volt_dict
         self.master_volts = {}
@@ -273,10 +453,11 @@ class simion:
         return(self.master_volts)
 
     def scale_volts(self,volt_dict,scale_fact):
+        '''
+        Scales voltages in volt_dict by float value in scale_fact
+        '''
         m_volts = self.get_master_volts(volt_dict)
         s_volts = {}
         for num,nam in self.elect_dict.items():
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
         return(s_volts)
-
-    # def check_volts()

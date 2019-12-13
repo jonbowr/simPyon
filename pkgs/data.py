@@ -26,6 +26,7 @@ class sim_data:
         self.df = {}
         for head, arr in zip(self.header, np.transpose(data)):
             self.df[head.lower()] = arr
+            
         #define the cylindrical symmetry coords
         self.df['r'] = np.sqrt(self.df['z']**2 + self.df['y']**2)
         self.df['omega'] = np.arctan2(self.df['z'],self.df['y'])
@@ -39,6 +40,7 @@ class sim_data:
         self.df['vtheta'] = vtheta
         self.df['theta'] = np.arctan2(vr,np.sqrt(self.df['vx']**2+self.df['vtheta']**2))*180/np.pi
         self.df['phi'] = np.arctan2(vtheta,self.df['vx'])*180/np.pi
+
         # fix the count rate for increase in CS counts with radius
         if R_WEIGHT == True:
             self.df['counts'] = np.zeros(len(self.df['x']))

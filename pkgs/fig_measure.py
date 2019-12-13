@@ -352,7 +352,7 @@ class measure:
 
 
 class mark:
-	def __init__(self,fig,ax):
+	def __init__(self,fig,ax,ref_lines= False):
 		self.fig = fig
 		self.ax = ax
 		self.grab = [False]
@@ -360,7 +360,11 @@ class mark:
 		self.pts = []
 		self.pts_info = []
 		self.info_lines = []
-
+		self.x_lines = []
+		self.y_lines = []
+		self.ref_lines = ref_lines
+		ax.plot(ax.get_xlim(),[0,0],color = 'black',alpha = .7)
+		ax.plot([0,0],ax.get_ylim(),color = 'black',alpha = .7)
 	def connect(self):
 		print('Fig Measure connected:\nDouble Click outside Plot to Remove Marks')
 		self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
@@ -376,10 +380,19 @@ class mark:
 			pt_info = self.ax.annotate('(%.1f,%.1f)'%(event.xdata,event.ydata),
 						[event.xdata,event.ydata],
 						xytext = (4,4),textcoords = 'offset pixels')
+			if self.ref_lines == True:	
+				x_line = self.ax.plot([0,event.xdata],[event.ydata,event.ydata],
+				                      '--',color = 'black', alpha = .4)[0]
+				y_line = self.ax.plot([event.xdata,event.xdata],[0,event.ydata],
+				                      '--',color = 'black', alpha = .4)[0]
+				self.x_lines.append(x_line)
+				self.y_lines.append(y_line)
+
 			self.pts.append(pt)
 			self.pts_info.append(pt_info)
 			self.info_lines.append(self.ax.plot([event.xdata]*2,
 											   [event.ydata]*2,color = 'gray')[0])
+
 			self.pointer_loc = np.array([[pt.get_xdata(),
 										pt.get_ydata()] for pt in self.pts])
 			self.fig.canvas.draw()
@@ -402,6 +415,14 @@ class mark:
 						xytext = (4,4),textcoords = 'offset pixels')
 			self.info_lines[pick_pt].set_xdata([event.xdata]*2)
 			self.info_lines[pick_pt].set_ydata([event.ydata]*2)
+
+			if self.ref_lines == True:
+				self.x_lines[pick_pt].set_xdata([0,event.xdata])
+				self.x_lines[pick_pt].set_ydata([event.ydata,event.ydata])
+
+				self.y_lines[pick_pt].set_xdata([event.xdata,event.xdata])
+				self.y_lines[pick_pt].set_ydata([0,event.ydata])
+			
 			self.fig.canvas.draw()
 			self.fig.canvas.flush_events()
 		elif any(self.grab_txt):
@@ -439,6 +460,13 @@ class mark:
 			
 			self.info_lines[-1].remove()
 			del(self.info_lines[-1])
+
+			if self.ref_lines == True:
+				self.y_lines[-1].remove()
+				del(self.y_lines[-1])
+
+				self.x_lines[-1].remove()
+				del(self.x_lines[-1])
 
 			self.fig.canvas.draw()
 			self.fig.canvas.flush_events()

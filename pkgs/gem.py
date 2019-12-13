@@ -42,11 +42,6 @@ class part_group:
         self.og_parts = np.unique(part_img)
         self.group_parts = np.unique(part_img)
         self.part_num = 0
-        # self.group_dict = {}
-        # self.axbox = plt.axes([0.5, 0.9, 0.2, 0.06], autoscale_on = False)
-        # self.text_box = widgets.TextBox(self.axbox, 'Part Grouping:', initial='')
-        # self.text_box.on_submit(submit)
-        # plt.tight_layout()
 
     def connect(self):
         print('Part Group connected:\nDouble Click outside Plot to Disconnect')
@@ -138,11 +133,13 @@ def bmp_get_verts(image,gaus_w = .8):
             dr = srt_pts[n,:] - sml_vert
             r_srt = np.argsort(np.sqrt(np.sum(dr**2,axis = 1)))
             m = 0
-            line_h,line_l = skim.draw.line(srt_pts[n,0],srt_pts[n,1],sml_vert[r_srt[m],0],sml_vert[r_srt[m],1])
+            line_h,line_l = skim.draw.line(srt_pts[n,0],srt_pts[n,1],
+                                           sml_vert[r_srt[m],0],sml_vert[r_srt[m],1])
             line_sum = []
             while(np.any(part_img[line_h,line_l] == 0) and m+1 < len(sml_vert)):
                 m += 1
-                line_h,line_l = skim.draw.line(srt_pts[n,0],srt_pts[n,1],sml_vert[r_srt[m],0],sml_vert[r_srt[m],1])
+                line_h,line_l = skim.draw.line(srt_pts[n,0],srt_pts[n,1],
+                                               sml_vert[r_srt[m],0],sml_vert[r_srt[m],1])
             if m == len(sml_vert)-1 and len(sml_vert)-1 != 0:
                 m = pathfind(part_img,srt_pts[n,:],sml_vert[r_srt])[1]
                 print(m)
@@ -270,14 +267,6 @@ def draw_from_gem(line,canvas_shape,pxls_mm = 1):
         img[locs[0],locs[1]] = 1
     return (img.astype(bool))
 
-# def poly_draw_from_gem(line):
-#   draw_type = com_type(line)
-#   v_tex = get_vtex(line)
-#   if draw_type == 'polyline':
-#       # ax.plot(v_tex[:,0],v_tex[:,1], color = col)
-#       return (v_tex)
-    # else: return([])
-
 def next_up(str_list, start, stop):
         z = 0
         line = str_list[0]
@@ -361,7 +350,7 @@ def gem_draw(gem_file, canvas = [],pxls_mm = None):
 def gem_draw_poly(gem_file,measure = False,
                   mark=False,
                   annotate = False,
-                  elec_names = []):
+                  elec_names = [],origin = [0,0]):
     elec_verts,exclude_verts = get_verts(gem_file)
     electrodes = {}
     excludes = {}
@@ -369,9 +358,9 @@ def gem_draw_poly(gem_file,measure = False,
         electrodes[nam] = []
         excludes[nam] = []
         for part in elec_verts[nam]:
-            electrodes[nam].append(Polygon(part))
+            electrodes[nam].append(Polygon(part-origin))
         for ex in exclude_verts[nam]:
-            excludes[nam].append(Polygon(ex,color = 'white'))
+            excludes[nam].append(Polygon(ex-origin,color = 'white'))
     patches = []
     keys = []
 
