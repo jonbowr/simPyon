@@ -239,13 +239,14 @@ class simion:
         self.run()
         print(time.time()-start_time)
 
-    def particle_traj(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
+    def particle_traj(self,n_parts = 100,cores = multiprocessing.cpu_count(),
                       surpress_output = False, dat_step = 30,show= True):
         '''
-        Fly n_parts particles using the particle probability distributions defined in self.parts. 
+        Fly n_parts particles, and plot their trajectories. Uses the particle probability 
+        distributions defined in self.parts, but tracks the particle movement. 
         Parallelizes the fly processes by spawing a number of instances associated with the
         number of cores of the processing computer. Resulting particle data is stored in 
-        self.data as a simPyon.data.sim_data object. 
+        self.traj_data as a list of dictionaries. 
 
         Parameters
         ----------
