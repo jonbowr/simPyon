@@ -12,6 +12,7 @@ from . import gem
 from .particles import auto_parts
 from .data import sim_data
 from ..defaults import *
+from shutil import copy
 
 class simion:
     '''
@@ -57,10 +58,10 @@ class simion:
     parts : simPyon.particles.sim_parts object
         distribution of source particles 
     '''
-    def __init__(self,volt_dict = {},home = './'):
+    def __init__(self,volt_dict = {},home = './',gemfil = '',recfil = ''):
         self.commands = []
         self.home = home
-        self.sim = r'simion.exe --nogui --noprompt --default-num-particles=100000 '
+        self.sim = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
         self.elec_num = []
         self.pa = []
         self.gemfil = []
@@ -68,6 +69,13 @@ class simion:
         self.volt_dict = volt_dict
         self.data = []
         self.parts = auto_parts()
+
+        # copy rec file to home directory if none already exists
+        if recfil == '':
+            self.recfil = self.home+'simPyon_base.rec'
+            copy("%s/rec/simPyon_base.rec"%\
+                            os.path.dirname(os.path.dirname(__file__)+'..'),
+                            self.recfil)
 
         # Grab workbench, potential arrays and gemfiles from current directory
         for file in os.listdir(home):
@@ -79,10 +87,16 @@ class simion:
                     self.pa0 = os.path.join(root,file)
                 elif file.endswith(".pa#"):
                     self.pa = os.path.join(root,file).strip('#')
-        for file in os.listdir(home):
-            if file.lower().endswith(".gem"):
-                self.gemfil = os.path.join(home,file)
+        if gemfil =='':
+            for file in os.listdir(home):
+                if file.lower().endswith(".gem"):
+                    self.gemfil = os.path.join(home,file)
+        else:
+            self.gemfil = gemfil
+
+        #scrape the gemfile for numbers
         self.get_elec_nums_gem()
+
 
     def gem2pa(self,pa):
         '''
@@ -106,7 +120,7 @@ class simion:
         self.commands = r"refine %s#" % self.pa
         self.run()
 
-    def volt_adjust(self,voltages, quiet = False):
+    def __volt_adjust__(self,voltages, quiet = False):
         '''
         executes simion command to actually execute fast adjust
 
@@ -167,13 +181,13 @@ class simion:
             print(volts)
         for num,volt in zip(self.elec_num,volts):
             dict_out[self.elect_dict[num]] = volt
-        self.volt_adjust(volts,quiet = quiet)
+        self.__volt_adjust__(volts,quiet = quiet)
         if keep:
             self.volt_dict = dict_out
         return(self)  
 
-    def fly(self,n_parts = 1000,
-        cores = multiprocessing.cpu_count(),surpress_output = False):
+    def fly(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
+            surpress_output = False):
         '''
         Fly n_parts particles using the particle probability distributions defined in self.parts. 
         Parallelizes the fly processes by spawing a number of instances associated with the
@@ -194,66 +208,16 @@ class simion:
         '''
 
         start_time = time.time()
-        checks = []
-        fly_fils = []
-        self.parts.n = int(n_parts/cores)
-        for i in range(int(cores)):
-            fly_fil = self.home+'auto_fly_%i.ion'%i
-            fly_fils.append(fly_fil)
-            self.parts.fil = fly_fil
-            self.parts.ion_print()
 
-        for ion_fil in fly_fils:
-            loc_com = r"fly  "+\
-            r" --retain-trajectories=0 --restore-potentials=0"
-            loc_com += r" --particles=" + ion_fil
-            loc_com += r" %s"%self.bench
-            self.commands = loc_com
-            f = tmp.TemporaryFile()
-            check = subprocess.Popen(self.sim+' '+self.commands,
-                stdout = f)
-            checks.append((check,f))
 
-        outs = []
-        for check,f in checks:
-            check.wait()
+        # Fly the particles in parallel and scrape the resulting data from the shell
+        outs = core_fly(self,n_parts,cores,surpress_output)
+        data = str_data_scrape(outs,n_parts,cores,surpress_output)
+        self.data = sim_data(data)
 
-        for check,f in checks:
-            f.seek(0)
-            outs.append(f.read())
-            check.kill()
-
-        for nam in fly_fils:
-            if os.path.isfile(nam)==True:
-                os.remove(nam)
-
-        tot_lines = []
-        j=0
-        b = 0
-        for out in outs:
-            st_out = str(out).split('\\r\\n')
-            out_line = []
-            start = False
-            for line in st_out:
-                if start == True:
-                    if line[0].isdigit(): 
-                        out_line.append(np.fromstring(line,sep = ',')) 
-                elif j == 0 and surpress_output == False:print(line)
-                if "------ Begin Next Fly'm ------" in line:
-                    start = True
-            if start == False:
-                print('============= Fly Failed on Core %d ============='%j)
-                for line in st_out: print(line)
-                print('============= Fly Failed on Core %d ============='%j)
-                return()
-            for i in range(len(out_line)):
-                out_line[i][0] += int(n_parts/cores)*j
-            tot_lines+=out_line
-            j+=1
         if surpress_output == False:
             print(time.time() - start_time)
-        data = np.stack(tot_lines)
-        self.data = sim_data(data)
+
         return(self)
 
     def old_fly(self,outfile, bench, particles = [],remove = True):
@@ -274,6 +238,57 @@ class simion:
         start_time = time.time()
         self.run()
         print(time.time()-start_time)
+
+    def particle_traj(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
+                      surpress_output = False, dat_step = 30,show= True):
+        '''
+        Fly n_parts particles using the particle probability distributions defined in self.parts. 
+        Parallelizes the fly processes by spawing a number of instances associated with the
+        number of cores of the processing computer. Resulting particle data is stored in 
+        self.data as a simPyon.data.sim_data object. 
+
+        Parameters
+        ----------
+        n_parts: int
+            number of particles to be flown. n_parts/cores number of particles is flown in each 
+            instance of simion on each core. 
+        cores: int
+            number of cores to use to process the fly particles request. Default initializes 
+            a simion instance to run on each core. 
+        surpress_output: bool
+            With surpress_output == True, the preparation statement from one of the simion 
+            instances is printed to cmd. 
+        '''
+
+        # Copy Traj record file to working home directory
+        if os.path.isfile(self.home+'simPyon_traj.rec')==False:
+            copy("%s/rec/simPyon_traj.rec"%\
+                            os.path.dirname(os.path.dirname(__file__)+'..'),
+                            self.home)
+
+        # Fly the particles in parallel and scrape the resulting data from the shell
+        outs = core_fly(self,n_parts,cores,surpress_output)
+        data = str_data_scrape(outs,n_parts,cores,surpress_output)
+        
+        if surpress_output == False:
+            print(time.time() - start_time)
+        
+        # Parse the trajectory data into list of dictionaries
+        head = ["Ion N","X","Y","Z","KE"]
+        self.traj_data = []
+        for n in np.unique(data[:,0]):
+            self.traj_data.append(dict([h.lower(),arr[data[:,0]==n]] for h,arr in zip(head,np.transpose(data))))
+
+        # calculate the r position vec
+        for dat in self.traj_data:
+            dat['r'] = np.sqrt(dat['z']**2+dat['y']**2)
+
+        # Plot the trajectories
+        if show == True:
+            fig,ax = self.show()
+            for traj in self.traj_data:
+                ax.plot(traj['x'],traj['r'])
+        return(self)
 
     def get_elec_nums_gem(self, gem_fil=[]):
         '''
@@ -315,7 +330,8 @@ class simion:
         check.kill()
         return check
     
-    def show(self,measure = False,mark=False,annotate = False, origin = [0,0]):
+    def show(self,measure = False,mark=False,
+             annotate = False, origin = [0,0],collision_locs = False):
         '''
         Plots the geometry stored geometry file by scraping the gemfile for 
         polygon shape and renders them in pyplot using a collection of patches. 
@@ -335,20 +351,62 @@ class simion:
             Point in the simmetry plane to shift the origin to for the displayed geometry. 
 
         '''
-        fig,ax1 = gem.gem_draw_poly(self.gemfil,measure = measure,
+        fig,ax1 = gem.gem_draw_poly(self.gemfil,
+                                    measure = measure,
                                     mark=mark,
                                     annotate = annotate,
                                     elec_names = self.elect_dict,
                                     origin = origin)
         ax1.set_ylabel('$r=\sqrt{z^2 + y^2}$ [mm]')
         ax1.set_xlabel('x [mm]')
-        if self.data != []:
-            ax1.plot(self.data()['x'],self.data()['r'],'.')
-            all_h,all_x,all_y = np.histogram2d(self.data.stop()()['x'],
-                self.data.stop()()['r'], bins =int(400),
-                weights =self.data.stop()()['counts'])
-            cs = plt.contour((all_x[1:]+all_x[:-1])/2,
-                (all_y[1:]+all_y[:-1])/2,all_h.T)
+        if self.data != [] and collision_locs ==True:
+
+            
+            from scipy.interpolate import interpn
+
+            def density_scatter( x , y, ax = None, sort = True, bins = 20, **kwargs )   :
+                """
+                Scatter plot colored by 2d histogram
+                """
+                if ax is None :
+                    fig , ax = plt.subplots()
+                data , x_e, y_e = np.histogram2d( x, y, bins = bins)
+                z = interpn( ( 0.5*(x_e[1:] + x_e[:-1]) , 0.5*(y_e[1:]+y_e[:-1]) ) , data , 
+                            np.vstack([x,y]).T , method = "splinef2d", bounds_error = False )
+
+                # Sort the points by density, so that the densest points are plotted last
+                if sort :
+                    idx = z.argsort()
+                    x, y, z = x[idx], y[idx], z[idx]
+
+                ax.scatter( x, y, c=z, **kwargs )
+                return ax
+
+            # density_scatter(self.data.stop()['x'],self.data.stop()['r'],ax1,bins = 100)
+            ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.')
+            ax1.plot(self.data.good().stop()['x'],self.data.good().stop()['r'],'.',color = 'blue')
+            # for n in range(len(self.data.rf)):
+            #     ax1.plot([self.data.stop().good()['x'][n],128.2],
+            #     [self.data.stop().good()['r'][n],self.data.rf[n]])
+            # ax1.plot(self.data().stop()['x'],self.data().stop()()['r'],'.')
+            # Calculate the point density
+            # xy = np.vstack([self.data.good().start()()['x'],self.data.good().start()()['r']])
+            # z = gaussian_kde(xy)(xy)
+            # ax1.scatter(self.data.good().start()()['x'], self.data.good().start()()['r'],
+            #             c=z, s=100, edgecolor='')
+
+            # from scipy.stats import gaussian_kde
+            # xy = np.vstack([self.data.stop()['x'],self.data.stop()['r']])
+            # z = gaussian_kde(xy)(xy)
+            # ax1.scatter(self.data.stop()['x'], self.data.stop()['r'],
+            #             c=z, s=100, edgecolor='')
+
+
+            # all_h,all_x,all_y = np.histogram2d(self.data.stop()()['x'],
+            #     self.data.stop()()['r'], bins =int(400),
+            #     weights =self.data.stop()()['counts'])
+            # cs = plt.contour((all_x[1:]+all_x[:-1])/2,
+            #     (all_y[1:]+all_y[:-1])/2,all_h.T)
 
             fig,ax2 = plt.subplots(1)
             h,xbins,ybins = np.histogram2d(self.data.good().stop()()['z'],
@@ -374,7 +432,7 @@ class simion:
             for r in [r_min,r_max]:
                 x_min =circ(r,min(ybins)) 
                 x = np.linspace(-x_min,x_min,100)
-                ax2.plot(x,circ(r,x), color = 'r')
+                ax2.plot(x,circ(r,x), color = 'black')
         return(fig,ax1)
 
     def fly_steps(self,voltage_scale_factors,n_parts = 10000,e_max = 1000,
@@ -461,3 +519,72 @@ class simion:
         for num,nam in self.elect_dict.items():
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
         return(s_volts)
+
+def str_data_scrape(outs,n_parts,cores,surpress_output):
+    tot_lines = []
+    j=0
+    b = 0
+    for out in outs:
+        st_out = str(out).split('\\r\\n')
+        out_line = []
+        start = False
+        for line in st_out:
+            try:
+                if start == True:
+                    if line[0].isdigit(): 
+                        out_line.append(np.fromstring(line,sep = ',')) 
+                elif j == 0 and surpress_output == False:print(line)
+            except(IndexError):
+                pass
+            if "------ Begin Next Fly'm ------" in line:
+                start = True
+            # elif "Ion N" in line:
+            #     head = line
+        if start == False:
+            print('============= Fly Failed on Core %d ============='%j)
+            for line in st_out: print(line)
+            print('============= Fly Failed on Core %d ============='%j)
+            return()
+        for i in range(len(out_line)):
+            out_line[i][0] += int(n_parts/cores)*j
+        tot_lines+=out_line
+        j+=1
+    data = np.stack(tot_lines)
+    return(data)
+
+def core_fly(sim,n_parts,cores,surpress_output):
+    checks = []
+    fly_fils = []
+    sim.parts.n = int(n_parts/cores)
+    for i in range(int(cores)):
+        fly_fil = sim.home+'auto_fly_%i.ion'%i
+        fly_fils.append(fly_fil)
+        sim.parts.fil = fly_fil
+        sim.parts.ion_print()
+
+    for ion_fil in fly_fils:
+        loc_com = r"fly  "
+        loc_com+=r" --retain-trajectories=0 --restore-potentials=0"
+        loc_com+=r" --recording=%s"%sim.recfil
+        loc_com += r" --particles=" + ion_fil
+        loc_com += r" %s"%sim.bench
+        sim.commands = loc_com
+        f = tmp.TemporaryFile()
+        check = subprocess.Popen(sim.sim+' '+sim.commands,
+            stdout = f)
+        checks.append((check,f))
+
+    outs = []
+    for check,f in checks:
+        check.wait()
+
+    for check,f in checks:
+        f.seek(0)
+        outs.append(f.read())
+        check.kill()
+
+    for nam in fly_fils:
+        if os.path.isfile(nam)==True:
+            os.remove(nam)
+    return(outs)
+            

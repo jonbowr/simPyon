@@ -94,10 +94,19 @@ class pdf:
 
     def cos(x):
         return(np.cos(x*np.pi-np.pi/2))
+
+    def poisson(x,k=3):
+        norm = k**k*np.exp(-k)/np.math.factorial(k)
+        return((x*k**2)**k*np.exp(-x*k**2)/np.math.factorial(k)/norm)
     
+    def log(x):
+        return(1/x)
+
     func_dict = {
                 'sputtered':sputtered,
-                'cos':cos
+                'cos':cos,
+                'poinsson': poisson,
+                'log': log
                 }
 
     def __init__(self,f='sputtered'):
@@ -106,11 +115,11 @@ class pdf:
     def __call__(self,x):
         return(self.f(x))
 
-    def sample(self,n,a=0,b=1,log_space = False):
-        if log_space == True:
-            x = np.logspace(ln(a),ln(b),n)
-        else:
-            x = np.linspace(a,b,n)
+    def sample(self,n,a=0,b=1):
+        # if log_space == True:
+        #     x = np.logspace(np.log(a),np.log(b),n)
+        # else:
+        x = np.linspace(a,b,n)
         y = self.f(x)
         select = np.repeat(x,abs(y/(max(y)-min(y))*n).astype(int))
         return(np.random.choice(select,n))  
@@ -143,6 +152,31 @@ class source:
         return((pdf('cos').sample(n)*self.dist_vals['range']\
             -self.dist_vals['range']/2)+self.dist_vals['mean'])
 
+    def sample_vector(self,n):
+        self.dist_vals['index'] = np.random.choice(len(self.dist_vals['vector']),n)
+        return(self.dist_vals['vector'][self.dist_vals['index']])
+
+    def coupled_vector(self,n):
+        self.dist_vals['parent'].dist_vals['type'] = 'parent'
+        return(self.dist_vals['vector'][self.dist_vals['parent'].dist_vals['index']])
+
+    def cos_coupled_vector(self,n):
+        self.dist_vals['parent'].dist_vals['type'] = 'parent'
+        return((pdf('cos').sample(n)*180-180/2)+\
+               self.dist_vals['vector'][self.dist_vals['parent'].dist_vals['index']])
+
+    def beam_2_poisson(self,n):
+        return(self.dist_vals['E_beam']*abs(self.dist_vals['b']-pdf('poisson').sample(n,
+            self.dist_vals['a'],self.dist_vals['b'])))
+
+    def fixed_vector(self,n):
+        return(self.dist_vals['vector'][:n])
+
+    def log_uniform(self,n):
+        return(pdf('log').sample(n,
+            self.dist_vals['min'],self.dist_vals['max']))
+
+
     def __init__(self,dist_type='',n=1):
 
         func_dict = {'gaussian':self.gaussian,
@@ -150,14 +184,30 @@ class source:
                 'line':self.line,
                 'single':self.single,
                 'sputtered':self.sputtered,
-                'cos':self.cos
+                'cos':self.cos,
+                'sample_vector':self.sample_vector,
+                'coupled_vector':self.coupled_vector,
+                'cos_coupled_vector':self.cos_coupled_vector,
+                'fixed_vector':self.fixed_vector,
+                'log_uniform':self.log_uniform,
                 }
+
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
                 'line':{'first':np.array([0,0,0]),'last':np.array([1,1,0])},
-                'single':{'value':1},
+                'single':{'value':0},
                 'sputtered':{'E_beam':105,'a':.01,'b':.65},
-                'cos':{'mean':75,'range':180}
+                'cos':{'mean':75,'range':180},
+                'sample_vector':{'vector':np.linspace(0,1,1000)},
+                'coupled_vector':{'vector':np.linspace(0,1,1000),
+                                'parent':None,
+                                'type':'child'},
+                'cos_coupled_vector':{'vector':np.linspace(0,1,1000),
+                                'parent':None,
+                                'type':'child'},
+                'fixed_vector':{'vector':np.linspace(0,1,1000)},
+                'log_uniform':{'min':0.01,'max':1},
+
                 }
         if dist_type == '':
             dist_type = 'uniform'
@@ -221,13 +271,31 @@ class auto_parts:
                   'az':str(self.az),
                   'el':str(self.el),
                   'pos':str(self.pos)}))
+
+    def sample(self):
+        for samp_dist in [self.ke,self.az,self.el,self.pos]:
+            if 'type' in samp_dist.dist_vals:
+                if samp_dist.dist_vals['type'] == 'parent':
+                    distor = samp_dist(n = self.n)
+                    
+        for samp_dist in [self.ke,self.az,self.el,self.pos]:
+            if 'type' in samp_dist.dist_vals:
+                pass
+            else:
+                samp_dist(n = self.n)
+        
+        for samp_dist in [self.ke,self.az,self.el,self.pos]:
+            if 'type' in samp_dist.dist_vals:
+                if samp_dist.dist_vals['type'] == 'child':
+                    distor = samp_dist(n = self.n)
     # Ion File output headder
     #time of birth,mass,charge,x0,y0,z0,azimuth, elevation, energy, cfw, color
     def ion_print(self):
-        ke = abs(self.ke(n = self.n))
-        az = self.az(n = self.n)
-        el = self.el(n = self.n)
-        pos = self.pos(n = self.n)
+        self.sample()
+        ke = abs(self.ke.dist_out)
+        az = self.az.dist_out
+        el = self.el.dist_out
+        pos = self.pos.dist_out
         with open(self.fil, 'w') as fil:
             for n in range(len(ke)):
                 fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\

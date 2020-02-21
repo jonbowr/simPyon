@@ -262,7 +262,7 @@ def dat_plot(data,comp = [],names = [''],save = False,n_tot = 10000,just_eng = F
                     plt.axvline(45.1)
                     plt.axvline(35.4)
 
-def main_estep_scan(volt_base_dict,n_parts = 10000,col = None,e_peaks = []):
+def main_estep_scan(volt_base_dict,coms,n_parts = 10000,col = None,e_peaks = []):
     e_step_scale = np.array([.034735,81.2/1212,156/1212,307/1212,592/1212,1,1.93775])
     
     if e_peaks == []:
@@ -279,7 +279,7 @@ def main_estep_scan(volt_base_dict,n_parts = 10000,col = None,e_peaks = []):
     e_peaks_sub = np.array(e_peaks_sub)
     # e_peaks = e_peaks_sub
     # e_step_scale = e_step_scale_sub
-    coms = sim.simion(pa = pa_nam,gemfil = gem_nam)
+    # coms = sim.simion(pa = pa_nam,gemfil = gem_nam)
     tot_th = []
     tot_e = []
     plt.figure(1)

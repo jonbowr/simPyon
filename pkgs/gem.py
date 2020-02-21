@@ -7,8 +7,9 @@ from matplotlib import pyplot as plt
 from matplotlib import widgets
 from shapely.geometry import Polygon as spoly
 from shapely.geometry import MultiPolygon as mpoly
-from matplotlib.patches import Polygon
+from matplotlib.patches import Polygon,Ellipse
 from matplotlib.collections import PatchCollection
+from matplotlib import path
 from mpl_toolkits import mplot3d
 import time
 from . import fig_measure as meat
@@ -247,6 +248,7 @@ def get_vtex(line,draw_type = []):
         pos[:,1] = np.array([pos_sim[0,1],pos_sim[1,1],pos_sim[1,1],pos_sim[0,1]])
     elif draw_type == 'circle':        
         pos = np.fromstring(within(line,'(',')'),sep =',')
+
     return (pos)
 
 def draw_from_gem(line,canvas_shape,pxls_mm = 1):
@@ -281,7 +283,7 @@ def next_up(str_list, start, stop):
             char = line[l]
         return (z,l)
 
-def gem_draw(gem_file, canvas = [],pxls_mm = None):
+def gem_draw(gem_file, canvas = [],pxls_mm = None,plot = True):
     with open(gem_file) as lines:
         file_lines = lines.readlines()
 
@@ -342,15 +344,17 @@ def gem_draw(gem_file, canvas = [],pxls_mm = None):
 
     # for elec in electrodes:
     #     canvas = np.logical_or(canvas,elec)
-    plt.imshow(~np.transpose(canvas),origin = 'lower')
-    plt.show()
+    if plot == True:
+        plt.imshow(~np.transpose(canvas),origin = 'lower')
+        plt.show()
     return(~np.transpose(canvas))
 
 
 def gem_draw_poly(gem_file,measure = False,
                   mark=False,
                   annotate = False,
-                  elec_names = [],origin = [0,0]):
+                  elec_names = [],origin = [0,0],
+                  path_out = False):
     elec_verts,exclude_verts = get_verts(gem_file)
     electrodes = {}
     excludes = {}
@@ -372,9 +376,10 @@ def gem_draw_poly(gem_file,measure = False,
             keys.append(elec)
             patches.append(part)
             xy.append(part.get_xy())
-        xy = np.concatenate(xy,axis = 0)
-        elec_center[elec] = [xy[np.argmin(xy[:,1]),0],
-        xy[np.argmin(xy[:,1]),1]]
+        if len(xy)!=0:
+            xy = np.concatenate(xy,axis = 0)
+            elec_center[elec] = [xy[np.argmin(xy[:,1]),0],
+            xy[np.argmin(xy[:,1]),1]]
         # np.mean(xy[:,0]),np.max(xy[:,1])]
         
     p = PatchCollection(patches,alpha = 1)
@@ -410,7 +415,10 @@ def gem_draw_poly(gem_file,measure = False,
             nams = [elec_names[num] for num in numbers]
         lab = meat.label(fig,ax,nams,locations)
         lab.connect()
-    return(fig,ax)
+    if path_out == False:
+        return(fig,ax)
+    else:
+        return(fig,ax,electrodes)
 
 
 
@@ -775,4 +783,174 @@ def check_voltage(gemfile,volts):
                     plt.plot([pt[0],arr[1][0]],[pt[1],arr[1][1]],
                              color = pl.cm.plasma(arr[-1]/1000))
     return(elec_check)
+
+
+class line_draw:
+    def __init__(self,fig,ax):
+        # self.fig,self.ax = plt.subplots(1)
+        self.fig = fig
+        self.ax = ax
+        self.line = self.ax.plot([0,0],[0,0])[0]
+        # self.img_handle = self.ax.imshow(img.astype(int),origin = 'lower',animated = True)
+        self.clickd = False
+        # self.img = img.astype(int)
+
+    def connect(self):
+        print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
+        self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+        self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+        self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+        input('')
+        return(self.line)
+    
+    def onclick(self,event):
+        if plt.get_current_fig_manager().toolbar.mode != '': return
+        
+        if event.xdata != None and event.ydata !=None:
+            self.clickd = True
+            self.line.set_xdata(event.xdata)
+            self.line.set_ydata(event.ydata)
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+        elif event.ydata == None and event.dblclick == True:
+            self.disconnect()
+    def on_motion(self,event):
+        if self.clickd:
+            # self.img[event.ydata.astype(int),
+            #         event.xdata.astype(int)] = 4
+            # self.line.get_xdata().append(event.xdata)
+            # self.line.get_ydata().append(event.ydata)
+            self.line.set_xdata(np.append(self.line.get_xdata(),np.array(event.xdata)))
+            self.line.set_ydata(np.append(self.line.get_ydata(),np.array(event.ydata)))
+            
+            # self.ax.imshow(self.img,origin = 'lower',animated = True)
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+    
+    def on_release(self,event):
+        self.clickd = False
+
+    def disconnect(self):
+        self.fig.canvas.mpl_disconnect(self.cidpress)
+        self.fig.canvas.mpl_disconnect(self.cidrelease)
+        self.fig.canvas.mpl_disconnect(self.cidmotion)
+        print('We are Disconnected: Press Any key to continue')
+
+def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
+    #==============================================================================
+    # Function smooth: inputs 1d array of data, performs a running average to smooth 
+    #       data
+    # input:
+    #       arr (array length N): continuous array of data to be smoothed
+    #       itterations: how many times to perform the smoothing
+    # output:
+    #       arr(smooth) (array length N): of smoothed data  
+    # Author: Jonathan Bower, University of New Hampshire 2018
+    #==============================================================================
+    def smooth(arr,itterations=1):
+        for i in range(itterations):
+            smoot=np.zeros(len(arr))
+            smoot[0]=np.nanmean([arr[0],arr[1]])
+            smoot[1:-1]=np.nanmean(np.stack([arr[0:-2],arr[1:-1],arr[2:]]),axis = 0)
+            smoot[-1]=np.nanmean([arr[-1],arr[-2]])
+            arr=smoot
+        return(arr)
+
+
+    from scipy.interpolate import interp1d
+    if img == []:
+        img = gem_draw(gemfile,plot = False)
+    fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
+    
+    line = line_draw(fig,ax).connect()
+    line.set_solid_capstyle('round')
+    line_verts = np.stack(line.get_data()).T
+    poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
+    polyline = ax.add_patch(Polygon(poly_verts))
+    check = '1'
+    w = 1
+    d = .2
+
+    poly_verts[:,0] = smooth(poly_verts[:,0],2)
+    poly_verts[:,1] = smooth(poly_verts[:,1],2)
+    og_verts = poly_verts.copy() 
+    og_L = np.sum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
+                                     axis = 1)))
+    pts_mm = 5
+    got_edge = np.zeros(len(poly_verts)).astype(bool)
+    # fx = interp1d(np.linspace(0,1,len(poly_verts)),poly_verts[:,0],kind = 'cubic')
+    # fy = interp1d(np.linspace(0,1,len(poly_verts)),poly_verts[:,1],kind = 'cubic')
+
+    # poly_verts = np.zeros((len(poly_verts)*20,2))
+    # poly_verts[:,0] = fx(np.linspace(0,1,len(poly_verts)))
+    # poly_verts[:,1] = fy(np.linspace(0,1,len(poly_verts)))
+    
+
+    print('press any key to grow, q to quit')
+    while check != 'q':
+
+        L = np.zeros(len(poly_verts)) 
+        L[1:] = np.cumsum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
+                                     axis = 1)))
+        fx = interp1d(L,poly_verts[:,0],kind = 'cubic')
+        fy = interp1d(L,poly_verts[:,1],kind = 'cubic')
+        f_got = interp1d(L,got_edge,kind = 'linear')
+
+        poly_verts = np.zeros((int(L[-1]*pts_mm),2))
+        # poly_verts = np.zeros((len(og_verts)*w,2))
+        poly_verts[:,0] = fx(np.linspace(min(L),max(L),len(poly_verts)))
+        poly_verts[:,1] = fy(np.linspace(min(L),max(L),len(poly_verts)))
+        got_edge = f_got(np.linspace(min(L),max(L),len(poly_verts))).round().astype(bool)
+
+        rec_verts = np.zeros((len(poly_verts)+2,poly_verts.shape[1]))
+        rec_verts[1:-1,:] = poly_verts[:,:]
+        rec_verts[0,:] = poly_verts[-2,:]
+        rec_verts[-1,:] = poly_verts[1,:]
+
+        # rec_verts[:,0] = smooth(rec_verts[:,0],2)
+        # rec_verts[:,1] = smooth(rec_verts[:,1],2)
+
+        # poly_delt = (rec_verts[2:,:]-rec_verts[:-2,:])
+        poly_delt = ((rec_verts[2:,:]-rec_verts[:-2,:])+
+                     (rec_verts[1:-1,:]-rec_verts[:-2,:])+
+                     (rec_verts[2:,:]-rec_verts[1:-1,:]))/3
+
+        ang = np.arctan2(poly_delt[:,1],poly_delt[:,0])
+        dx = np.sin(ang)*d
+        dy = np.cos(ang)*d
+        
+        for n in range(len(poly_verts)):
+            if got_edge[n] == False:
+                got_edge[n] = np.logical_or(\
+                                ~img[((poly_verts[n,1] + dy[n])*10).round().astype(int),
+                                ((poly_verts[n,0] - dx[n])*10).round().astype(int)],
+                                ~img[((poly_verts[n,1])*10).round().astype(int),
+                                ((poly_verts[n,0])*10).round().astype(int)])
+        
+        poly_verts[~got_edge,0] += -dx[~got_edge]
+        poly_verts[~got_edge,1] += dy[~got_edge]
+
+
+        polyline.set_xy(poly_verts)
+        # ax.add_patch(Polygon(poly_verts))
+        # line.set_markersize(w)
+        w+=1
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+        check = input()
+
+        
+    print(w)
+    # ax.add_patch(Polygon(np.concatenate((np.stack(line.get_data()).T,
+    #                                              np.flipud(np.stack(line.get_data()).T)))))
+    # # line_grad = np.zeros(img.shape)
+    # line.set_clip_on(True)
+    # # for part_name in elec_patches:
+    # # for piece in elec_patches[1]:
+    # line.set_clip_path(elec_patches[0][0])
+    garb,unique_edge = np.unique(np.round(poly_verts[got_edge]*pts_mm),
+                                 axis = 0,return_index = True) 
+    return(poly_verts[got_edge][unique_edge],ang[got_edge][unique_edge])
+    # for pt_n in range(len(line)-1):
+
 

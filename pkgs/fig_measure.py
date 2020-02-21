@@ -177,18 +177,25 @@ class measure:
 		self.pts = [self.ax.plot(0,0,'+',color = 'k')[0],
 					self.ax.plot(0,0,'+',color = 'k')[0]]
 		self.line = self.ax.plot([0,0],[0,0])[0]
+		self.active = True
 
 	def connect(self):
-		print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
 		self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 		self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
 		self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
-		input('')
+		return(self)
+		# input('')
 	
 	def onclick(self,event):
 		# print(self.click_num)
 		# measure.lock = self
+
+		self.grab = [pt.contains(event)[0] for pt in self.pts]
+
 		if plt.get_current_fig_manager().toolbar.mode != '': return
+		
+		if self.active == False: return
+
 		if event.ydata != None and event.dblclick == True:
 			# self.clear()
 			self.tot_lines += self.lines
@@ -235,14 +242,13 @@ class measure:
 				self.pointer_loc[1,:] = np.array([event.xdata,event.ydata])
 				self.pts[1].set_xdata(event.xdata)
 				self.pts[1].set_ydata(event.ydata)
-				self.line.set_xdata(self.pointer_loc[:,0])
-				self.line.set_ydata(self.pointer_loc[:,1])
+				# self.line.set_xdata(self.pointer_loc[:,0])
+				# self.line.set_ydata(self.pointer_loc[:,1])
 			# # print(self.pointer_loc)
 
 				# self.pts += [self.ax.plot(self.pointer_loc[-1,0],self.pointer_loc[-1,1],'+',color = 'k')[0]]
 				self.set_pts()
 			self.click_num += 1
-			self.grab = [pt.contains(event)[0] for pt in self.pts]
 			# if self.click_num > 2 and any(self.grab):
 			# 		self.clear()
 			# print(self.grab)
@@ -253,8 +259,11 @@ class measure:
 			self.pts[np.argwhere(self.grab)[0][0]].set_xdata(event.xdata)
 			self.pts[np.argwhere(self.grab)[0][0]].set_ydata(event.ydata)
 			self.pointer_loc = np.array([[pt.get_xdata(),pt.get_ydata()] for pt in self.pts])
-			self.line.set_xdata(self.pointer_loc[:,0])
-			self.line.set_ydata(self.pointer_loc[:,1])
+			# self.line.set_xdata(self.pointer_loc[:,0])
+			# self.line.set_ydata(self.pointer_loc[:,1])
+			if any(self.grab) and self.click_num > 2:
+				self.clear()
+				self.set_pts()
 			# self.pointer_loc = np.array([[pt.get_xdata(),pt.get_ydata()] for pt in self.pts])
 			# self.line.set_xdata(self.pointer_loc[:,0])
 			# self.line.set_ydata(self.pointer_loc[:,1])
@@ -280,6 +289,7 @@ class measure:
 		self.lines = []
 		self.fig.canvas.draw()
 		self.fig.canvas.flush_events()
+
 	def tot_clear(self):
 		# self.click_num = 0
 		for lineer in self.lines:
@@ -336,20 +346,17 @@ class measure:
 		self.lines += [self.ax.add_patch(ang_draw)]
 		self.fig.canvas.draw()
 		self.fig.canvas.flush_events()
-		print(self.pointer_loc)
-		print('dx = %.2f'%(dx))
-		print('dy = %.2f'%(dy))
-		print('dr = %.2f'%L)
-		print('Elev: %.2f'%(sml_ang))
+		# print(self.pointer_loc)
+		# print('dx = %.2f'%(dx))
+		# print('dy = %.2f'%(dy))
+		# print('dr = %.2f'%L)
+		# print('Elev: %.2f'%(sml_ang))
 
 
 	def disconnect(self):
 		self.fig.canvas.mpl_disconnect(self.cidpress)
 		self.fig.canvas.mpl_disconnect(self.cidrelease)
 		self.fig.canvas.mpl_disconnect(self.cidmotion)
-		plt.close(self.fig)
-		print('We are Disconnected: Press Any key to continue')
-
 
 class mark:
 	def __init__(self,fig,ax,ref_lines= False):
@@ -365,15 +372,22 @@ class mark:
 		self.ref_lines = ref_lines
 		ax.plot(ax.get_xlim(),[0,0],color = 'black',alpha = .7)
 		ax.plot([0,0],ax.get_ylim(),color = 'black',alpha = .7)
+		self.active = True
+
 	def connect(self):
-		print('Fig Measure connected:\nDouble Click outside Plot to Remove Marks')
+		# print('Fig Measure connected:\nDouble Click outside Plot to Remove Marks')
 		self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 		self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
 		self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
-		input('')
+		return(self)
+		# input('')
 	
 	def onclick(self,event):
+		self.grab = [pt.contains(event)[0] for pt in self.pts]
+		self.grab_txt = [txt.contains(event)[0] for txt in self.pts_info]
 		if plt.get_current_fig_manager().toolbar.mode != '': return
+		if self.active == False: return
+		
 		if event.ydata != None and event.dblclick == True:
 			self.grab = [False]
 			pt = self.ax.plot(event.xdata,event.ydata,'+',color = 'k')[0]
@@ -398,9 +412,9 @@ class mark:
 			self.fig.canvas.draw()
 			self.fig.canvas.flush_events()
 
-		elif event.dblclick == False and event.ydata != None and event.xdata != None:
-			self.grab = [pt.contains(event)[0] for pt in self.pts]
-			self.grab_txt = [txt.contains(event)[0] for txt in self.pts_info]
+		# elif event.dblclick == False and event.ydata != None and event.xdata != None:
+		# 	self.grab = [pt.contains(event)[0] for pt in self.pts]
+		# 	self.grab_txt = [txt.contains(event)[0] for txt in self.pts_info]
 		elif event.dblclick == False and event.ydata==None:
 			self.clear()
 
@@ -425,6 +439,7 @@ class mark:
 			
 			self.fig.canvas.draw()
 			self.fig.canvas.flush_events()
+
 		elif any(self.grab_txt):
 			pick_pt =  np.argwhere(self.grab_txt)[0][0] 
 			self.pts_info[pick_pt].remove()
@@ -470,6 +485,7 @@ class mark:
 
 			self.fig.canvas.draw()
 			self.fig.canvas.flush_events()
+
 	def tot_clear(self):
 		for pt,info,line in zip(self.pts,self.pts_info,self.info_lines):
 			pt.remove()
@@ -486,9 +502,6 @@ class mark:
 		self.fig.canvas.mpl_disconnect(self.cidpress)
 		self.fig.canvas.mpl_disconnect(self.cidrelease)
 		self.fig.canvas.mpl_disconnect(self.cidmotion)
-		plt.close(self.fig)
-		print('We are Disconnected: Press Any key to continue')
-
 
 class label:
 	def __init__(self,fig,ax,names,locs):
@@ -511,7 +524,6 @@ class label:
 		self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 		self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
 		self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
-		input('')
 	
 	def onclick(self,event):
 		if plt.get_current_fig_manager().toolbar.mode != '': return
@@ -563,3 +575,5 @@ def part_plot(part_groups):
 			plt.plot(part[:,0],part[:,1],color = cmap(i/len(part_groups)))
 				# plt.xlim(xlim)
 				# plt.ylim(ylim)
+
+

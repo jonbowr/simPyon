@@ -54,6 +54,11 @@ class sim_data:
                     np.sum(self.df['counts'][starts])
                 self.df['counts'][stops][:] = self.df['counts'][starts]
 
+        # load the detection parameters From defaults so they can be actively updated
+        self.obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
+                    'R_MAX':R_MAX,'R_MIN':R_MIN,
+                    'TOF_MEASURE':TOF_MEASURE}
+
     def __call__(self):
         return(self.df)
 
@@ -62,6 +67,9 @@ class sim_data:
 
     def __iter__(self):
         return(iter(self.df))
+
+    def __getitem__(self,item):
+        return(self.df[item])
 
     def throughput(self):
         return(np.sum(self.good().start().df['counts'])/\
@@ -76,8 +84,12 @@ class sim_data:
         return(sim_data(self.data[stopz]))
 
     def good_tof(self):
-        gx = self.df['x'][log_stops(self.df['ion n'])] > 72
-        gy = self.df['r'][log_stops(self.df['ion n'])] < 50
+        gx = np.logical_and(self.df['x'][log_stops(self.df['ion n'])] < self.obs['X_MAX'],
+                            self.df['x'][log_stops(self.df['ion n'])] > self.obs['X_MIN'])
+
+        # self.df['x'][log_stops(self.df['ion n'])] > 72
+        gy = np.logical_and(self.df['r'][log_stops(self.df['ion n'])] < self.obs['R_MIN'],
+                            self.df['r'][log_stops(self.df['ion n'])] > self.obs['R_MAX'])
         goot = np.logical_and(gx, gy)
         good_ions = np.in1d(
             self.df['ion n'], self.df['ion n'][
@@ -86,21 +98,36 @@ class sim_data:
 
     def good(self):
         stops = log_stops(self.df['ion n'])
-        gx = np.logical_and(self.df['x'][stops] > X_MIN,
-                    self.df['x'][stops] < X_MAX)
-        gy = np.logical_and(self.df['r'][stops] < R_MAX,
-                    self.df['r'][stops] > R_MIN) 
+        gx = np.logical_and(self.df['x'][stops] > self.obs['X_MIN'],
+                    self.df['x'][stops] < self.obs['X_MAX'])
+        gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
+                    self.df['r'][stops] > self.obs['R_MIN']) 
         goot = np.logical_and(gx, gy)
 
-        if TOF_MEASURE == True:
+        if self.obs['TOF_MEASURE'] == True:
             r_max = 49
             r_min = 28
-            L = 50.9
-            theta_max = np.arctan2(r_max - self.df['r'][stops],L)*180/np.pi
-            theta_min = np.arctan2(r_min - self.df['r'][stops],L)*180/np.pi
-            g_theta = np.logical_and(self.df['theta'][stops] < theta_max,
-                                     self.df['theta'][stops] > theta_min)
+            L = 50.2
+            yf = self.df['y'][stops]+\
+                L*self.df['vy'][stops]/self.df['vx'][stops]
+
+            zf = self.df['z'][stops]+\
+                L*self.df['vz'][stops]/self.df['vx'][stops]
+            rf = np.sqrt(zf**2+yf**2)
+            # r_fin = self.df['r'][stops] +\
+            #          L*np.sin(self.df['theta'][stops]*np.pi/180)*\
+            #          np.cos(self.df['phi'][stops]*np.pi/180)
+            # plt.figure()
+            # plt.plot()
+            # theta_max = np.arctan2(r_max - self.df['r'][stops],L)*180/np.pi
+            # theta_min = np.arctan2(r_min - self.df['r'][stops],L)*180/np.pi
+            # g_theta = np.logical_and(self.df['theta'][stops] < theta_max,
+            #                          self.df['theta'][stops] > theta_min)
+
+            g_theta = np.logical_and(rf < r_max,
+                                     rf > r_min)
             goot = np.logical_and(goot,g_theta)
+            self.rf = rf[goot]
         good_ions = np.in1d(
             self.df['ion n'], self.df['ion n'][
                 log_starts(self.df['ion n'])][goot])
