@@ -653,7 +653,7 @@ volt_base_IMAP_dict = {'Conversion Surface':-713.6,
 volt_base_IBEX_dict = {'Conversion Surface':-415,
                     'P2 Electrode':-482,
                     'P3 Electrode': 0,
-                    'Inner ESA':814, #840
+                    'Inner ESA':816, #840
                     'Outter Esa':0,
                     'P9 Electrode':-167,
                     'P10 Electrode':1212,

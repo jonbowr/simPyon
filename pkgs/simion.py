@@ -58,7 +58,8 @@ class simion:
     parts : simPyon.particles.sim_parts object
         distribution of source particles 
     '''
-    def __init__(self,volt_dict = {},home = './',gemfil = '',recfil = ''):
+    def __init__(self,volt_dict = {},home = './',
+                 gemfil = '',recfil = '',traj_recfil = '',bench = ''):
         self.commands = []
         self.home = home
         self.sim = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
@@ -69,7 +70,8 @@ class simion:
         self.volt_dict = volt_dict
         self.data = []
         self.parts = auto_parts()
-
+        self.traj_refil = traj_recfil
+        self.trajectory_quality = 3
         # copy rec file to home directory if none already exists
         if recfil == '':
             self.recfil = self.home+'simPyon_base.rec'
@@ -78,9 +80,13 @@ class simion:
                             self.recfil)
 
         # Grab workbench, potential arrays and gemfiles from current directory
-        for file in os.listdir(home):
+        if bench == '':
+            for file in os.listdir(home):
                 if file.endswith(".iob"):
                     self.bench = os.path.join(home,file)
+        else:
+            self.bench = os.path.join(home,bench)
+
         for root,dirs,files in os.walk(home):
             for file in files:
                 if file.endswith(".pa0"):
@@ -92,8 +98,9 @@ class simion:
                 if file.lower().endswith(".gem"):
                     self.gemfil = os.path.join(home,file)
         else:
-            self.gemfil = gemfil
+            self.gemfil = home + gemfil
 
+        self.name = gemfil.upper().strip('.GEM')
         #scrape the gemfile for numbers
         self.get_elec_nums_gem()
 
@@ -170,7 +177,7 @@ class simion:
         elif type(volt_dict) == dict: 
                 self.volt_dict = volt_dict
         dict_out = dict([(elec,volt_dict[elec]) for elec in volt_dict])
-        volts = [volt_dict[self.elect_dict[val]]*\
+        volts = [(volt_dict[self.elect_dict[val]] if self.elect_dict[val] in volt_dict else 0)*\
         (scale_fact if val < 16 else 1) for val in self.elec_num]
             # self.volt_dict = dict(volt_dict[self.elect_dict[val]]*\
             # (scale_fact if val < 16 else 1) for val in self.elec_num)
@@ -211,7 +218,8 @@ class simion:
 
 
         # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,surpress_output)
+        outs = core_fly(self,n_parts,cores,surpress_output,
+                        trajectory_quality =self.trajectory_quality)
         data = str_data_scrape(outs,n_parts,cores,surpress_output)
         self.data = sim_data(data)
 
@@ -240,7 +248,7 @@ class simion:
         print(time.time()-start_time)
 
     def particle_traj(self,n_parts = 100,cores = multiprocessing.cpu_count(),
-                      surpress_output = False, dat_step = 30,show= True):
+                      surpress_output = False, dat_step = 30,show= True,geo_3d = False):
         '''
         Fly n_parts particles, and plot their trajectories. Uses the particle probability 
         distributions defined in self.parts, but tracks the particle movement. 
@@ -262,23 +270,29 @@ class simion:
         '''
 
         # Copy Traj record file to working home directory
-        if os.path.isfile(self.home+'simPyon_traj.rec')==False:
+        # if os.path.isfile(self.home+'simPyon_traj.rec')==False:
+
+        if self.traj_refil == '':
             copy("%s/rec/simPyon_traj.rec"%\
                             os.path.dirname(os.path.dirname(__file__)+'..'),
                             self.home)
+            # os.remove(self.home+'simPyon_traj.rec')
 
+        start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,surpress_output)
+        outs = core_fly(self,n_parts,cores,surpress_output,
+                        rec_fil = self.home + 'simPyon_traj.rec',
+                        markers = 20,trajectory_quality = 0)
         data = str_data_scrape(outs,n_parts,cores,surpress_output)
         
         if surpress_output == False:
             print(time.time() - start_time)
         
         # Parse the trajectory data into list of dictionaries
-        head = ["Ion N","X","Y","Z","KE"]
+        head = ["X","Y","Z","V","Grad V","ke"]
         self.traj_data = []
         for n in np.unique(data[:,0]):
-            self.traj_data.append(dict([h.lower(),arr[data[:,0]==n]] for h,arr in zip(head,np.transpose(data))))
+            self.traj_data.append(dict([h.lower(),arr[data[:,0]==n]] for h,arr in zip(head,np.transpose(data[:,1:]))))
 
         # calculate the r position vec
         for dat in self.traj_data:
@@ -286,9 +300,29 @@ class simion:
 
         # Plot the trajectories
         if show == True:
-            fig,ax = self.show()
-            for traj in self.traj_data:
-                ax.plot(traj['x'],traj['r'])
+            if geo_3d == False:
+                fig,ax = self.show()
+                for traj in self.traj_data:
+                    ax.plot(traj['x'],traj['r'])
+            if geo_3d == True:
+                from mpl_toolkits.mplot3d import Axes3D,art3d
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+                elec_verts,exclude_verts = gem.get_verts(self.gemfil)
+                for el in elec_verts.values():
+                    for vt in el:
+                        ax.plot(vt[:,0],np.zeros(len(vt)),vt[:,1],
+                                color = 'grey')
+                        ax.plot(vt[:,0],np.zeros(len(vt)),-vt[:,1],
+                                color = 'grey')
+                        ax.plot(vt[:,0],-vt[:,1],np.zeros(len(vt)),
+                                color = 'grey')
+                        
+                for traj in self.traj_data:
+                    ax.plot(traj['x'],-traj['z'],traj['y'])
+                ax.view_init(30, -70)
+                # ax.set_aspect('equal')
+                return(fig,ax)
         return(self)
 
     def get_elec_nums_gem(self, gem_fil=[]):
@@ -436,7 +470,7 @@ class simion:
                 ax2.plot(x,circ(r,x), color = 'black')
         return(fig,ax1)
 
-    def fly_steps(self,voltage_scale_factors,n_parts = 10000,e_max = 1000,
+    def fly_steps(self,voltage_scale_factors,n_parts = 10000,particle_scale = '',part_value = 1000,
                   volt_base_dict={}):
         '''
         Fly particles for a set of voltages generated by scaling stored voltages 
@@ -474,8 +508,9 @@ class simion:
                         scale_fact = scale)
             else:
                 self.fast_adjust(scale_fact = scale)
-            self.parts.ke.dist_vals['max'] = \
-                    e_max*scale
+            # if particle_scale != '':
+            #     self.parts.ke.dist_vals['max'] = \
+            #             e_max*scale
             data.append(self.fly(n_parts = n_parts).data)
         return(data)
 
@@ -553,7 +588,7 @@ def str_data_scrape(outs,n_parts,cores,surpress_output):
     data = np.stack(tot_lines)
     return(data)
 
-def core_fly(sim,n_parts,cores,surpress_output):
+def core_fly(sim,n_parts,cores,surpress_output,rec_fil = '',markers = 0,trajectory_quality = 3):
     checks = []
     fly_fils = []
     sim.parts.n = int(n_parts/cores)
@@ -566,7 +601,10 @@ def core_fly(sim,n_parts,cores,surpress_output):
     for ion_fil in fly_fils:
         loc_com = r"fly  "
         loc_com+=r" --retain-trajectories=0 --restore-potentials=0"
-        loc_com+=r" --recording=%s"%sim.recfil
+        loc_com+=r" --trajectory-quality=%d"%trajectory_quality
+        if markers !=0:
+            loc_com+=r" --markers=%d"%markers
+        loc_com+=r" --recording=%s"%(sim.recfil if rec_fil == '' else rec_fil)
         loc_com += r" --particles=" + ion_fil
         loc_com += r" %s"%sim.bench
         sim.commands = loc_com
