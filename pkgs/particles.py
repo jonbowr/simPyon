@@ -299,4 +299,5 @@ class auto_parts:
         with open(self.fil, 'w') as fil:
             for n in range(len(ke)):
                 fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                    (0,self.mass,self.charge,pos[n,0],pos[n,1],0,az[n],el[n],ke[n],1,1))
+                    (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
+                     az[n],el[n],ke[n],1,1))
