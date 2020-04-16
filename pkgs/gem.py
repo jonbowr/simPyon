@@ -14,176 +14,8 @@ from mpl_toolkits import mplot3d
 import time
 from . import fig_measure as meat
 from matplotlib import style
-# style.use('default')
-# import plotly as pltly
+
 plt.ion()
-
-def log_grad(image):
-    grad = np.abs(np.gradient(image)) 
-    return((grad[0]+grad[1]).astype(bool))
-
-def pathfind(image,vertex,end_vert):
-    path_img = np.zeros(image.shape)
-    path_img[vertex[0],vertex[1]] = 1
-    i=0
-    while np.all(path_img[end_vert[:,0],end_vert[:,1]].astype(bool) == False):
-        path_img += log_grad(path_img)
-        path_img = np.logical_and(path_img,image).astype(int)
-        i+=1
-    vert_loc = np.argwhere(path_img[end_vert[:,0],end_vert[:,1]].astype(bool) == True)
-    next_vert = end_vert[vert_loc]
-    return(next_vert,vert_loc)
-
-class part_group:
-    def __init__(self,part_img):
-        self.click_num = 0
-        self.fig,self.ax = plt.subplots()
-        self.ax.imshow(part_img,origin = 'lower')
-        self.img = part_img
-        self.og_parts = np.unique(part_img)
-        self.group_parts = np.unique(part_img)
-        self.part_num = 0
-
-    def connect(self):
-        print('Part Group connected:\nDouble Click outside Plot to Disconnect')
-        self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
-        input('')
-    
-    def onclick(self,event):
-        if event.ydata == None and event.dblclick == True:
-            # return([self.og_parts,self.group_parts])
-            self.disconnect()
-        elif event.ydata != None and event.xdata != None:
-            if self.click_num % 2 == 0:
-                self.part_num = self.img[int(event.ydata), int(event.xdata)]
-                print('Electrode %d selected' % self.part_num ) 
-                # self.text_box.label = 'Part Grouping: %f'%self.part_num
-                self.click_num += 1
-                print(self.click_num)
-            else:
-                print('Electrode %d grouped to %d' % (self.img[int(event.ydata),
-                                     int(event.xdata)],self.part_num) )
-                self.group_parts[self.group_parts == self.img[int(event.ydata), int(event.xdata)]] = self.part_num
-                self.img[self.img == self.img[int(event.ydata), int(event.xdata)]] = self.part_num
-
-                self.ax.imshow(self.img,origin ='lower')
-                self.fig.canvas.draw()
-                self.fig.canvas.flush_events()
-                self.click_num +=1
-
-    def disconnect(self):
-        self.fig.canvas.mpl_disconnect(self.cid)
-        self.part_groups = np.transpose(np.stack((self.og_parts,self.group_parts)))[1:,:]
-        plt.close(self.fig)
-        print(np.stack((self.og_parts,self.group_parts)))
-        print('We are Disconnected: Press Any key to continue')
-
-    # def submit(self,text):
-    #   print(text)
-        # self.group_dict[group] = text
-
-
-class part_name:
-    def __init__(self,part_img):
-        self.fig,self.ax = plt.subplots()
-        self.ax.imshow(part_img)
-        self.img = part_img
-        self.part_names = {}
-
-    def connect(self):
-        print('Part Group connected:\nDouble Click outside Plot to Disconnect')
-        self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
-        input('')
-    
-    def onclick(self,event):
-        if event.ydata == None and event.dblclick == True:
-            self.disconnect()
-        elif event.ydata != None and event.xdata != None:
-            part_num = self.img[int(event.ydata), int(event.xdata)]
-            print('Electrode %d selected' % part_num ) 
-            self.part_names[part_num] = input('input name:')
-            
-    def disconnect(self):
-        self.fig.canvas.mpl_disconnect(self.cid)
-        self.part_groups = np.transpose(np.stack((self.og_parts,self.group_parts)))[1:,:]
-        plt.close(self.fig)
-        for part in part_names:
-            print("Electode %d Named: %s"%(part,part_names[part]))
-        print('We are Disconnected: Press Any key to continue')
-
-def bmp_get_verts(image,gaus_w = .8):
-    vert_coords = feature.corner_peaks(feature.corner_harris(image,method = 'eps',eps = 2))
-    coords_subpix = feature.corner_subpix(image, vert_coords,alpha = .1)
-    img_outline,parts = measure.label(feature.canny(image),connectivity = 2,return_num = True)
-    img_parts = measure.label(image)
-    grouping = part_group(img_parts)
-    grouping.connect()
-    part_groups = grouping.part_groups
-    input('Hit any key once grouping is complete')
-    sorted_verts = []
-    for part in range(1,parts+1):
-        print(part)
-        part_img = np.zeros(img_outline.shape)
-        part_img[img_outline == part] = 1
-        part_img = skim.filters.gaussian(part_img,sigma = gaus_w,preserve_range = True)
-        sml_vert = vert_coords[part_img[vert_coords[:,0],vert_coords[:,1]] != 0]
-        srt_pts = np.zeros(sml_vert.shape).astype(int)
-        srt_pts[0,:] =  sml_vert[0,:]
-        sml_vert = np.delete(sml_vert,0,axis = 0)
-        for n in range(len(sml_vert)):
-            dr = srt_pts[n,:] - sml_vert
-            r_srt = np.argsort(np.sqrt(np.sum(dr**2,axis = 1)))
-            m = 0
-            line_h,line_l = skim.draw.line(srt_pts[n,0],srt_pts[n,1],
-                                           sml_vert[r_srt[m],0],sml_vert[r_srt[m],1])
-            line_sum = []
-            while(np.any(part_img[line_h,line_l] == 0) and m+1 < len(sml_vert)):
-                m += 1
-                line_h,line_l = skim.draw.line(srt_pts[n,0],srt_pts[n,1],
-                                               sml_vert[r_srt[m],0],sml_vert[r_srt[m],1])
-            if m == len(sml_vert)-1 and len(sml_vert)-1 != 0:
-                m = pathfind(part_img,srt_pts[n,:],sml_vert[r_srt])[1]
-                print(m)
-                print(len(sml_vert))
-            srt_pts[n+1,:] = sml_vert[r_srt[m],:]
-            sml_vert = np.delete(sml_vert,r_srt[m],axis = 0)
-        sorted_verts += [srt_pts]
-    return(sorted_verts,part_groups)
-
-def clean_verts(sorted_verts):
-    small_verts = []
-    for part_vert in sorted_verts:
-        good_vert = np.array([part_vert[0,:]])
-        m=0
-        for n in range(1,len(part_vert)-1):
-            line_h,line_l = skim.draw.line(good_vert[m,0],good_vert[m,1],part_vert[n+1,0],part_vert[n+1,1])
-            if np.any(np.all(np.transpose(np.array([line_h,line_l])) == part_vert[n,:],axis = 1)):
-                pass
-            else:
-                good_vert = np.concatenate([good_vert,[part_vert[n,:]]],axis = 0)
-                m += 1
-                # print(good_vert)
-        good_vert = np.concatenate([good_vert,[part_vert[-1,:]]],axis = 0)
-        small_verts += [good_vert]
-    return(small_verts)
-
-def print_verts(vert_parts,file_nam, scale = 1,shift = 0,
-                part_groups = [],part_lable = []):
-    if part_groups == []:
-        part_groups = np.stack([np.arange(len(part_groups))]*2)
-    if part_lable == []:
-        part_lable = dict((i,'') for i in len(np.unique(part_groups)))
-        # part_lable = ['']*len(np.unique(part_groups))
-    with open(file_nam, 'w') as gemfil:
-        for i in part_lable:
-            gemfil.write('\n;' + part_lable[i] + '\n')
-            gemfil.write('electrode('+str(i)+ ')\n{\n')
-            gemfil.write('fill{\n')
-            for verts in [vert_parts[j[0]] for j in np.argwhere(part_groups[:,1]==i)]:
-                vert_string = np.array2string(np.concatenate(np.fliplr(verts*scale+shift)), 
-                                separator = ',',formatter={'float_kind':lambda x: "%.1f" % x},threshold = len(verts)*2)[1:-1]
-                gemfil.write('within{polyline('+vert_string+')}\n')
-            gemfil.write('}\n}\n')
 
 def find_all(a_str, sub):
     start = 0
@@ -238,24 +70,9 @@ def get_vtex(line,draw_type = []):
         return     
     elif draw_type == 'polyline':
         pos = np.fromstring(within(line,'(',')'),sep =',')
-
-        # pos = within(line,'(',')').split(',')
-        # p2 = []
-        # for p in pos:
-        #     p2.append(p.split(' '))
-        # print(p2)
-        # pos = np.array(p2).astype(float)
         pos = pos.reshape(-1,2)
     elif draw_type == 'box':
         pos = np.zeros((4,2))
-
-
-        # pos_sim = within(line,'(',')').split(',')
-        # p2 = []
-        # for p in pos_sim:
-        #     p2.append(p.split(' '))
-        # pos_sim = np.array(p2).astype(float)
-
         pos_sim = np.fromstring(within(line,'(',')'),sep =',')
 
         pos_sim = pos_sim.reshape(-1,2)
@@ -263,13 +80,6 @@ def get_vtex(line,draw_type = []):
         pos[:,1] = np.array([pos_sim[0,1],pos_sim[1,1],pos_sim[1,1],pos_sim[0,1]])
     elif draw_type == 'circle':        
         pos = np.fromstring(within(line,'(',')'),sep =',')
-
-        # pos = within(line,'(',')').split(',')
-        # p2 = []
-        # for p in pos:
-        #     p2.append(p.split(' '))
-        # pos = np.array(p2).flatten().astype(float)
-        # pos = Ellipse([vals[0],vals[1]],vals[2],vals[3]).get_path().vertices
 
     return (pos)
 
@@ -410,7 +220,7 @@ def gem_draw_poly(gem_file,measure = False,
                   annotate = False,
                   elec_names = [],origin = [0,0],
                   path_out = False,
-                  fig = [],ax = [],return_patch = False):
+                  fig = [],ax = []):
     from matplotlib import cm
     elec_verts,exclude_verts = get_verts(gem_file)
     electrodes = {}
@@ -441,24 +251,6 @@ def gem_draw_poly(gem_file,measure = False,
             elec_center[nam] = [xy[np.argmin(xy[:,1]),0],
             xy[np.argmin(xy[:,1]),1]]
         # np.mean(xy[:,0]),np.max(xy[:,1])]
-    # if ax_3d == True:
-    #     from mpl_toolkits.mplot3d import art3d
-    #     p = art3d.Patch3DCollection(patches,alpha = 1)
-    #     # p.set_array(np.array(keys))
-    #     ax.add_collection(p)
-    #     # art3d.patch_collection_2d_to_3d(p)
-    #     return(fig,ax)
-    if return_patch == True:
-        # from mpl_toolkits.mplot3d import Axes3D,art3d
-        # for pat in patches.values():
-        #     # print(pat)
-        #     art3d.patch_collection_2d_to_3d(pat,zdir = 'y')
-        #     ax.add_collection3d(pat)
-        # plt.show()
-        for el in elec_verts.values():
-            for vt in el:
-                ax.plot(vt[:,0],vt[:,1],np.zeros(len(vt)),color = 'black')
-        return()
 
     if fig == [] and ax == []:
         fig,ax = plt.subplots()
@@ -603,89 +395,6 @@ def get_verts(gem_file):
             elec_clip[nam].append(np.stack([x,y]).T)
     return(elec_clip,excludes)
 
-def gem_draw_3d(gem_file,measure = False):
-    with open(gem_file) as lines:
-        file_lines = lines.readlines()
-
-    reloc = []
-    new_lines = ['']*len(file_lines)
-
-    i = 0
-    # clean the file of comments,spaces and black lines
-    for line in file_lines:
-        line = line[:line.find(';')].strip('\n').strip(' ')
-        if line != '':
-            if line.find(',') !=-1 and line[-1] ==',':
-                new_lines[i]+=line.strip(' ')
-            else:
-                new_lines[i]+=line.strip(' ')
-                i+=1
-    for line,n in zip(new_lines,range(len(new_lines))):
-        if line == '':
-            del(new_lines[i])
-
-    elec_count = 0
-    n = 0
-    electrodes = {}
-    excludes = []
-    num = 0
-    for line in new_lines:
-        if line != '':
-            if line.lower()[:line.find(';')].find('electrode') != -1:
-                num = int(line[line.find('(')+1:line.find(')')])
-                if num not in electrodes:
-                    electrodes[num] = []
-        if line.replace(' ','').lower().count('fill') != 0 and line.replace(' ','').lower().count('rotate_fill') == 0:
-            # print(num)
-            op_brac = line[line.lower().find('fill'):].count('{')
-            close_brac = 0
-            m = 0
-            while op_brac > close_brac or op_brac == 0:
-                sub_line = new_lines[n+m]       
-                op_brac = op_brac + sub_line.count('{')
-                close_brac = close_brac + sub_line.count('}')
-                if draw_style(sub_line) == 'in':
-                    if com_type(sub_line) == 'polyline' or com_type(sub_line) == 'box':
-                        electrodes[num] += [get_vtex(sub_line)]
-                # elif draw_style(sub_line) == 'not_in':
-                #   if com_type(sub_line) == 'polyline' or com_type(sub_line) == 'box':
-                #       excludes.append(Polygon(get_vtex(sub_line),color = 'white'))
-                m += 1
-            elec_count += 1
-        n += 1
-    patches = []
-    keys = []
-
-    ax = plt.subplot(projection = '3d')
-    # print([nam for nam in electrodes])
-    for elec in [electrodes[16]]:
-        for part in elec:
-            # z = np.linspace(40,40,40)
-            theta = np.linspace(-np.pi,np.pi,200)
-            rr,tt = np.meshgrid(part[:,1],theta)
-            xx = np.meshgrid(part[:,0],theta)[0]
-            yy,zz = rr*np.cos(tt),rr*np.sin(tt)
-            # print([len(l) for l in [xx,yy,zz]])
-            # part = mesh.Trimesh(vert)
-            if np.all(xx < 100):
-                ax.plot_wireframe(xx,zz,yy,
-                    rcount = 100,ccount = 100)
-            # surf = pltly.graph_objs.Surface(x=xx,y=yy,z=zz)
-            # fig = pltly.graph_objs.Figure(data = [surf])
-
-            # fig.show()
-            # pltly.offline.plot([surf])
-            # theta = np.linspace(0,np.pi/2,100)
-            # y = np.cos(theta)*part[:,0]
-    # ax.set_aspect('equal')
-
-    ax.set_ylim(-70,70)
-    ax.set_xlim(0,140)
-    ax.set_zlim(-70,70)
-    ax.view_init(10,-170)
-    
-    return(ax)
-
 def gem_relocate(fil_in,fil_out):
     def find_all(a_str, sub):
         start = 0
@@ -828,7 +537,6 @@ def gem_relocate(fil_in,fil_out):
     #%%
     with open(fil_out, 'w') as f:
         for item in new_lines:
-    #        print(item)
             f.write(item.replace('within{','\nwithin{').replace('notin{','\nnotin{'))
     return(new_lines)
 
@@ -876,6 +584,7 @@ def gem_vert_chng(shift_gem, out_gem, shift_names, shift_vals):
 
 
 def check_voltage(gemfile,volts):
+    # Not working
     import matplotlib.pylab as pl
     import matplotlib as mpl
     elec_verts = get_verts(gemfile)[0]
@@ -911,7 +620,6 @@ def check_voltage(gemfile,volts):
     for nam in elec_check:
         for pt,n_check in zip(elec_check[nam][0],elec_check[nam][1]):
             for sub_nam,arr in n_check.items():
-                # mpl.colors.Normalize(vmin = 0,vmax = 1000)
                 if sub_nam<16 and nam<16:
                     plt.plot([pt[0],arr[1][0]],[pt[1],arr[1][1]],
                              color = pl.cm.plasma(arr[-1]/1000))
@@ -920,13 +628,10 @@ def check_voltage(gemfile,volts):
 
 class line_draw:
     def __init__(self,fig,ax):
-        # self.fig,self.ax = plt.subplots(1)
         self.fig = fig
         self.ax = ax
         self.line = self.ax.plot([0,0],[0,0])[0]
-        # self.img_handle = self.ax.imshow(img.astype(int),origin = 'lower',animated = True)
         self.clickd = False
-        # self.img = img.astype(int)
 
     def connect(self):
         print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
@@ -947,16 +652,12 @@ class line_draw:
             self.fig.canvas.flush_events()
         elif event.ydata == None and event.dblclick == True:
             self.disconnect()
+
     def on_motion(self,event):
         if self.clickd:
-            # self.img[event.ydata.astype(int),
-            #         event.xdata.astype(int)] = 4
-            # self.line.get_xdata().append(event.xdata)
-            # self.line.get_ydata().append(event.ydata)
             self.line.set_xdata(np.append(self.line.get_xdata(),np.array(event.xdata)))
             self.line.set_ydata(np.append(self.line.get_ydata(),np.array(event.ydata)))
             
-            # self.ax.imshow(self.img,origin = 'lower',animated = True)
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
     
@@ -968,126 +669,6 @@ class line_draw:
         self.fig.canvas.mpl_disconnect(self.cidrelease)
         self.fig.canvas.mpl_disconnect(self.cidmotion)
         print('We are Disconnected: Press Any key to continue')
-
-# def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
-#     #==============================================================================
-#     # Function smooth: inputs 1d array of data, performs a running average to smooth 
-#     #       data
-#     # input:
-#     #       arr (array length N): continuous array of data to be smoothed
-#     #       itterations: how many times to perform the smoothing
-#     # output:
-#     #       arr(smooth) (array length N): of smoothed data  
-#     # Author: Jonathan Bower, University of New Hampshire 2018
-#     #==============================================================================
-#     def smooth(arr,itterations=1):
-#         for i in range(itterations):
-#             smoot=np.zeros(len(arr))
-#             smoot[0]=np.nanmean([arr[0],arr[1]])
-#             smoot[1:-1]=np.nanmean(np.stack([arr[0:-2],arr[1:-1],arr[2:]]),axis = 0)
-#             smoot[-1]=np.nanmean([arr[-1],arr[-2]])
-#             arr=smoot
-#         return(arr)
-
-
-#     from scipy.interpolate import interp1d
-#     if img == []:
-#         img = gem_draw(gemfile,plot = False)
-#     canvas_shape,pxls_mm = get_canvas(gemfile)
-    
-#     fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
-    
-#     line = line_draw(fig,ax).connect()
-#     line.set_solid_capstyle('round')
-#     line_verts = np.stack(line.get_data()).T
-#     poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
-#     polyline = ax.add_patch(Polygon(poly_verts))
-#     check = '1'
-#     w = 1
-#     # d = .2
-
-#     poly_verts[:,0] = smooth(poly_verts[:,0],2)
-#     poly_verts[:,1] = smooth(poly_verts[:,1],2)
-#     og_verts = poly_verts.copy() 
-#     og_L = np.sum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
-#                                      axis = 1)))
-#     # pts_mm = 5
-#     got_edge = np.zeros(len(poly_verts)).astype(bool)
-#     # fx = interp1d(np.linspace(0,1,len(poly_verts)),poly_verts[:,0],kind = 'cubic')
-#     # fy = interp1d(np.linspace(0,1,len(poly_verts)),poly_verts[:,1],kind = 'cubic')
-
-#     # poly_verts = np.zeros((len(poly_verts)*20,2))
-#     # poly_verts[:,0] = fx(np.linspace(0,1,len(poly_verts)))
-#     # poly_verts[:,1] = fy(np.linspace(0,1,len(poly_verts)))
-    
-
-#     print('press any key to grow, q to quit')
-#     while check != 'q':
-
-#         L = np.zeros(len(poly_verts)) 
-#         L[1:] = np.cumsum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
-#                                      axis = 1)))
-#         fx = interp1d(L,poly_verts[:,0],kind = 'cubic')
-#         fy = interp1d(L,poly_verts[:,1],kind = 'cubic')
-#         f_got = interp1d(L,got_edge,kind = 'linear')
-
-#         poly_verts = np.zeros((int(L[-1]*pts_mm),2))
-#         # poly_verts = np.zeros((len(og_verts)*w,2))
-#         poly_verts[:,0] = fx(np.linspace(min(L),max(L),len(poly_verts)))
-#         poly_verts[:,1] = fy(np.linspace(min(L),max(L),len(poly_verts)))
-#         got_edge = f_got(np.linspace(min(L),max(L),len(poly_verts))).round().astype(bool)
-
-#         rec_verts = np.zeros((len(poly_verts)+2,poly_verts.shape[1]))
-#         rec_verts[1:-1,:] = poly_verts[:,:]
-#         rec_verts[0,:] = poly_verts[-2,:]
-#         rec_verts[-1,:] = poly_verts[1,:]
-
-#         # rec_verts[:,0] = smooth(rec_verts[:,0],2)
-#         # rec_verts[:,1] = smooth(rec_verts[:,1],2)
-
-#         # poly_delt = (rec_verts[2:,:]-rec_verts[:-2,:])
-#         poly_delt = ((rec_verts[2:,:]-rec_verts[:-2,:])+
-#                      (rec_verts[1:-1,:]-rec_verts[:-2,:])+
-#                      (rec_verts[2:,:]-rec_verts[1:-1,:]))/3
-
-#         ang = np.arctan2(poly_delt[:,0],poly_delt[:,1])
-#         dx = np.cos(ang)*d
-#         dy = np.sin(ang)*d
-        
-#         for n in range(len(poly_verts)):
-#             if got_edge[n] == False:
-#                 got_edge[n] = np.logical_or(\
-#                                 img[((poly_verts[n,0] + dx[n])*pxls_mm).round().astype(int),
-#                                 ((poly_verts[n,1] - dy[n])*pxls_mm).round().astype(int)],
-#                                 img[((poly_verts[n,0])*pxls_mm).round().astype(int),
-#                                 ((poly_verts[n,1])*pxls_mm).round().astype(int)])
-        
-#         poly_verts[~got_edge,0] += -dx[~got_edge]
-#         poly_verts[~got_edge,1] += dy[~got_edge]
-
-
-#         polyline.set_xy(poly_verts)
-#         # ax.add_patch(Polygon(poly_verts))
-#         # line.set_markersize(w)
-#         w+=1
-#         fig.canvas.draw()
-#         fig.canvas.flush_events()
-#         check = input()
-
-        
-#     print(w)
-#     # ax.add_patch(Polygon(np.concatenate((np.stack(line.get_data()).T,
-#     #                                              np.flipud(np.stack(line.get_data()).T)))))
-#     # # line_grad = np.zeros(img.shape)
-#     # line.set_clip_on(True)
-#     # # for part_name in elec_patches:
-#     # # for piece in elec_patches[1]:
-#     # line.set_clip_path(elec_patches[0][0])
-#     garb,unique_edge = np.unique(np.round(poly_verts[got_edge]*pts_mm),
-#                                  axis = 0,return_index = True) 
-
-#     return(poly_verts[got_edge][unique_edge],ang[got_edge][unique_edge])
-#     # for pt_n in range(len(line)-1):
 
 def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
     #==============================================================================
@@ -1106,7 +687,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
             arr=smoot
         return(arr)
 
-
     from scipy.interpolate import interp1d
     if img == []:
         img = gem_draw(gemfile,plot = False).T
@@ -1121,7 +701,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
     polyline = ax.add_patch(Polygon(poly_verts))
     check = '1'
     w = 1
-    # d = .2
 
     poly_verts[:,0] = smooth(poly_verts[:,0],2)
     poly_verts[:,1] = smooth(poly_verts[:,1],2)
@@ -1130,13 +709,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
                                      axis = 1)))
     pts_mm = 5
     got_edge = np.zeros(len(poly_verts)).astype(bool)
-    # fx = interp1d(np.linspace(0,1,len(poly_verts)),poly_verts[:,0],kind = 'cubic')
-    # fy = interp1d(np.linspace(0,1,len(poly_verts)),poly_verts[:,1],kind = 'cubic')
-
-    # poly_verts = np.zeros((len(poly_verts)*20,2))
-    # poly_verts[:,0] = fx(np.linspace(0,1,len(poly_verts)))
-    # poly_verts[:,1] = fy(np.linspace(0,1,len(poly_verts)))
-    
 
     print('press any key to grow, q to quit')
     while check != 'q':
@@ -1149,7 +721,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
         f_got = interp1d(L,got_edge,kind = 'linear')
 
         poly_verts = np.zeros((int(L[-1]*pts_mm),2))
-        # poly_verts = np.zeros((len(og_verts)*w,2))
         poly_verts[:,0] = fx(np.linspace(min(L),max(L),len(poly_verts)))
         poly_verts[:,1] = fy(np.linspace(min(L),max(L),len(poly_verts)))
         got_edge = f_got(np.linspace(min(L),max(L),len(poly_verts))).round().astype(bool)
@@ -1159,10 +730,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
         rec_verts[0,:] = poly_verts[-2,:]
         rec_verts[-1,:] = poly_verts[1,:]
 
-        # rec_verts[:,0] = smooth(rec_verts[:,0],2)
-        # rec_verts[:,1] = smooth(rec_verts[:,1],2)
-
-        # poly_delt = (rec_verts[2:,:]-rec_verts[:-2,:])
         poly_delt = ((rec_verts[2:,:]-rec_verts[:-2,:])+
                      (rec_verts[1:-1,:]-rec_verts[:-2,:])+
                      (rec_verts[2:,:]-rec_verts[1:-1,:]))/3
@@ -1170,14 +737,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
         ang = np.arctan2(poly_delt[:,1],poly_delt[:,0])
         dx = np.sin(ang)*d
         dy = np.cos(ang)*d
-        
-        # for n in range(len(poly_verts)):
-        #     if got_edge[n] == False:
-        #         got_edge[n] = np.logical_or(\
-        #                         img[((poly_verts[n,1] + dy[n])*10).round().astype(int),
-        #                         ((poly_verts[n,0] - dx[n])*10).round().astype(int)],
-        #                         img[((poly_verts[n,1])*10).round().astype(int),
-        #                         ((poly_verts[n,0])*10).round().astype(int)])
         
         got_edge = np.logical_or(got_edge,
                                  np.logical_or(\
@@ -1191,8 +750,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
 
 
         polyline.set_xy(poly_verts)
-        # ax.add_patch(Polygon(poly_verts))
-        # line.set_markersize(w)
         w+=1
         fig.canvas.draw()
         fig.canvas.flush_events()
@@ -1200,13 +757,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
 
         
     print(w)
-    # ax.add_patch(Polygon(np.concatenate((np.stack(line.get_data()).T,
-    #                                              np.flipud(np.stack(line.get_data()).T)))))
-    # # line_grad = np.zeros(img.shape)
-    # line.set_clip_on(True)
-    # # for part_name in elec_patches:
-    # # for piece in elec_patches[1]:
-    # line.set_clip_path(elec_patches[0][0])
     garb,unique_edge = np.unique(np.round(poly_verts[got_edge]*pts_mm),
                                  axis = 0,return_index = True)
     edge_verts = poly_verts[got_edge][unique_edge] 

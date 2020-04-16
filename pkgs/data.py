@@ -56,8 +56,7 @@ class sim_data:
 
         # load the detection parameters From defaults so they can be actively updated
         self.obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
-                    'R_MAX':R_MAX,'R_MIN':R_MIN,
-                    'TOF_MEASURE':TOF_MEASURE}
+                    'R_MAX':R_MAX,'R_MIN':R_MIN}
 
     def __call__(self):
         return(self.df)
@@ -83,19 +82,6 @@ class sim_data:
         stopz = log_stops(self.df['ion n'])
         return(sim_data(self.data[stopz]))
 
-    def good_tof(self):
-        gx = np.logical_and(self.df['x'][log_stops(self.df['ion n'])] < self.obs['X_MAX'],
-                            self.df['x'][log_stops(self.df['ion n'])] > self.obs['X_MIN'])
-
-        # self.df['x'][log_stops(self.df['ion n'])] > 72
-        gy = np.logical_and(self.df['r'][log_stops(self.df['ion n'])] < self.obs['R_MIN'],
-                            self.df['r'][log_stops(self.df['ion n'])] > self.obs['R_MAX'])
-        goot = np.logical_and(gx, gy)
-        good_ions = np.in1d(
-            self.df['ion n'], self.df['ion n'][
-                log_starts(self.df['ion n'])][goot])
-        return(sim_data(self.data[good_ions]))
-
     def good(self):
         stops = log_stops(self.df['ion n'])
         gx = np.logical_and(self.df['x'][stops] > self.obs['X_MIN'],
@@ -110,9 +96,13 @@ class sim_data:
         return(sim_data(self.data[good_ions]))
 
     def not_good(self):
-        gx = self.df['x'][log_stops(self.df['ion n'])] > 72
-        gy = self.df['r'][log_stops(self.df['ion n'])] < 50
+        stops = log_stops(self.df['ion n'])
+        gx = np.logical_and(self.df['x'][stops] > self.obs['X_MIN'],
+                    self.df['x'][stops] < self.obs['X_MAX'])
+        gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
+                    self.df['r'][stops] > self.obs['R_MIN']) 
         goot = np.logical_and(gx, gy)
+
         good_ions = np.in1d(
             self.df['ion n'], self.df['ion n'][
                 log_starts(self.df['ion n'])][goot])

@@ -179,9 +179,7 @@ class simion:
         dict_out = dict([(elec,volt_dict[elec]) for elec in volt_dict])
         volts = [(volt_dict[self.elect_dict[val]] if self.elect_dict[val] in volt_dict else 0)*\
         (scale_fact if val < 16 else 1) for val in self.elec_num]
-            # self.volt_dict = dict(volt_dict[self.elect_dict[val]]*\
-            # (scale_fact if val < 16 else 1) for val in self.elec_num)
-        # print(volts)
+        
         if quiet == False:
             for val in self.elec_num:
                 print(self.elect_dict[val])
@@ -417,39 +415,14 @@ class simion:
                 ax.scatter( x, y, c=z, **kwargs )
                 return ax
 
-            # density_scatter(self.data.stop()['x'],self.data.stop()['r'],ax1,bins = 100)
             ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.')
             ax1.plot(self.data.good().stop()['x'],self.data.good().stop()['r'],'.',color = 'blue')
-            # for n in range(len(self.data.rf)):
-            #     ax1.plot([self.data.stop().good()['x'][n],128.2],
-            #     [self.data.stop().good()['r'][n],self.data.rf[n]])
-            # ax1.plot(self.data().stop()['x'],self.data().stop()()['r'],'.')
-            # Calculate the point density
-            # xy = np.vstack([self.data.good().start()()['x'],self.data.good().start()()['r']])
-            # z = gaussian_kde(xy)(xy)
-            # ax1.scatter(self.data.good().start()()['x'], self.data.good().start()()['r'],
-            #             c=z, s=100, edgecolor='')
-
-            # from scipy.stats import gaussian_kde
-            # xy = np.vstack([self.data.stop()['x'],self.data.stop()['r']])
-            # z = gaussian_kde(xy)(xy)
-            # ax1.scatter(self.data.stop()['x'], self.data.stop()['r'],
-            #             c=z, s=100, edgecolor='')
-
-
-            # all_h,all_x,all_y = np.histogram2d(self.data.stop()()['x'],
-            #     self.data.stop()()['r'], bins =int(400),
-            #     weights =self.data.stop()()['counts'])
-            # cs = plt.contour((all_x[1:]+all_x[:-1])/2,
-            #     (all_y[1:]+all_y[:-1])/2,all_h.T)
 
             fig,ax2 = plt.subplots(1)
             h,xbins,ybins = np.histogram2d(self.data.good().stop()()['z'],
                 self.data.good().stop()()['y'], bins =int(30/10000*len(self.data)/2),
                 weights =self.data.good().stop()()['counts'])
-            if TOF_MEASURE == True:
-                ax2.scatter(self.data.good_tof().stop()()['z'],
-                self.data.good_tof().stop()()['y'],color = 'red')
+
             ax2.scatter(self.data.good().stop()()['z'],
             self.data.good().stop()()['y'], color = 'blue')
             ax2.set_xlabel('z [mm]')
@@ -460,11 +433,8 @@ class simion:
 
             def circ(r,x_vec):
                 return(np.sqrt(r**2 - x_vec**2))
-            
-            r_max = 45.1
-            r_min = 35.4
 
-            for r in [r_min,r_max]:
+            for r in [R_MIN,R_MAX]:
                 x_min =circ(r,min(ybins)) 
                 x = np.linspace(-x_min,x_min,100)
                 ax2.plot(x,circ(r,x), color = 'black')
@@ -494,23 +464,12 @@ class simion:
         e_steps: 
         '''
         data = []
-        # upper_eng = np.copy(self.parts.ke.dist_vals['max'])
-        # volt_scale_factors = {1:.034735,
-        #               2:81.2/1212,
-        #               3:156/1212,
-        #               4:307/1212,
-        #               5:592/1212,
-        #               6:1,
-        #               7:1.93775}
         for scale in voltage_scale_factors:
             if volt_base_dict != {}:
                 self.fast_adjust(volt_base_dict,
                         scale_fact = scale)
             else:
                 self.fast_adjust(scale_fact = scale)
-            # if particle_scale != '':
-            #     self.parts.ke.dist_vals['max'] = \
-            #             e_max*scale
             data.append(self.fly(n_parts = n_parts).data)
         return(data)
 
