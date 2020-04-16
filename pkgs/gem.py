@@ -14,7 +14,8 @@ from mpl_toolkits import mplot3d
 import time
 from . import fig_measure as meat
 from matplotlib import style
-
+# style.use('default')
+# import plotly as pltly
 plt.ion()
 
 def find_all(a_str, sub):
@@ -707,7 +708,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
     og_verts = poly_verts.copy() 
     og_L = np.sum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
                                      axis = 1)))
-    pts_mm = 5
+    # pts_mm = 5
     got_edge = np.zeros(len(poly_verts)).astype(bool)
 
     print('press any key to grow, q to quit')

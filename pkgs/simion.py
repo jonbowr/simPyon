@@ -179,7 +179,7 @@ class simion:
         dict_out = dict([(elec,volt_dict[elec]) for elec in volt_dict])
         volts = [(volt_dict[self.elect_dict[val]] if self.elect_dict[val] in volt_dict else 0)*\
         (scale_fact if val < 16 else 1) for val in self.elec_num]
-        
+
         if quiet == False:
             for val in self.elec_num:
                 print(self.elect_dict[val])
@@ -319,6 +319,7 @@ class simion:
                 for traj in self.traj_data:
                     ax.plot(traj['x'],-traj['z'],traj['y'])
                 ax.view_init(30, -70)
+
                 # ax.set_aspect('equal')
                 return(fig,ax)
         return(self)
