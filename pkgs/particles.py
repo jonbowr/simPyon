@@ -162,8 +162,9 @@ class source:
 
     def cos_coupled_vector(self,n):
         self.dist_vals['parent'].dist_vals['type'] = 'parent'
-        return((pdf('cos').sample(n)*180-180/2)+\
+        return((pdf('cos').sample(len(self.dist_vals['parent'].dist_vals['index']))*180-180/2)+\
                self.dist_vals['vector'][self.dist_vals['parent'].dist_vals['index']])
+        # return((pdf('cos').sample(len(self.dist_vals['parent'].dist_vals['index']))*180-180/2))
 
     def beam_2_poisson(self,n):
         return(self.dist_vals['E_beam']*abs(self.dist_vals['b']-pdf('poisson').sample(n,
@@ -175,6 +176,18 @@ class source:
     def log_uniform(self,n):
         return(pdf('log').sample(n,
             self.dist_vals['min'],self.dist_vals['max']))
+
+    def coupled_func(self,n):
+        if self.dist_vals['type'] == 'parent':
+            # not going to reset to none type after initilaized
+            # if type(self.dist_vals['sample']) == 'NoneType':
+            self.dist_vals['sample'] = self.dist_vals['sample_func'](n)
+            return(self.dist_vals['f'](self.dist_vals['sample']))
+        elif self.dist_vals['type'] == 'child':
+            # if type(self.dist_vals['parent'].dist_vals['sample']) == 'NoneType':
+                # self.dist_vals['parent'].dist_vals['sample'] = \
+                    # self.dist_vals['sample_func'](n)
+            return(self.dist_vals['f'](self.dist_vals['parent'].dist_vals['sample']))
 
 
     def __init__(self,dist_type='',n=1):
@@ -190,7 +203,7 @@ class source:
                 'cos_coupled_vector':self.cos_coupled_vector,
                 'fixed_vector':self.fixed_vector,
                 'log_uniform':self.log_uniform,
-                }
+                'coupled_func':self.coupled_func}
 
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
@@ -207,15 +220,26 @@ class source:
                                 'type':'child'},
                 'fixed_vector':{'vector':np.linspace(0,1,1000)},
                 'log_uniform':{'min':0.01,'max':1},
-
+                'coupled_func':{'f':[],
+                                'sample_func':np.random.rand,
+                                'type':'child',
+                                'sample':None,
+                                'parent':None}
                 }
+
+        self.defaults = func_defaults
+        # if type(dist_type) == str:
         if dist_type == '':
             dist_type = 'uniform'
 
-        self.defaults = func_defaults
         self.dist_type = dist_type.lower()
         self.f = func_dict[self.dist_type]
         self.dist_vals = func_defaults[self.dist_type]
+        # else:
+        #     self.f = dist_type
+        #     self.dist_vals = {}
+        #     self.dist_type = str(dist_type)
+
         self.n = n
 
     def __call__(self,n = []):

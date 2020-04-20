@@ -105,9 +105,13 @@ class sim_data:
         goot = np.logical_and(gx, gy)
 
         if self.obs['TOF_MEASURE'] == True:
-            r_max = 49
-            r_min = 28
-            L = 50.2
+            # r_max = 49
+            # r_min = 28
+            # L = 50.2
+            r_max = 47
+            r_min = 31.5
+            L=27.5
+            
             yf = self.df['y'][stops]+\
                 L*self.df['vy'][stops]/self.df['vx'][stops]
 
