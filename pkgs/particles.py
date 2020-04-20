@@ -119,10 +119,11 @@ class pdf:
         # if log_space == True:
         #     x = np.logspace(np.log(a),np.log(b),n)
         # else:
-        x = np.linspace(a,b,n)
-        y = self.f(x)
-        select = np.repeat(x,abs(y/(max(y)-min(y))*n).astype(int))
-        return(np.random.choice(select,n))  
+        # x = np.linspace(a,b,n)
+        x = np.random.rand(n)*(b-a)+a
+        # y = self.f(x)
+        # select = np.repeat(x,abs(y/(max(y)-min(y))*n).astype(int))
+        return(np.random.choice(x,weights = self.f(x),k = n))  
 
 
 class source:
@@ -190,7 +191,7 @@ class source:
             return(self.dist_vals['f'](self.dist_vals['parent'].dist_vals['sample']))
 
 
-    def __init__(self,dist_type='',n=1):
+    def __init__(self,dist_type='',n=1,dist_vals = {}):
 
         func_dict = {'gaussian':self.gaussian,
                 'uniform':self.uniform,
@@ -234,11 +235,12 @@ class source:
 
         self.dist_type = dist_type.lower()
         self.f = func_dict[self.dist_type]
-        self.dist_vals = func_defaults[self.dist_type]
-        # else:
-        #     self.f = dist_type
-        #     self.dist_vals = {}
-        #     self.dist_type = str(dist_type)
+        if dist_vals == {}:
+            self.dist_vals = func_defaults[self.dist_type]
+        elif all(list(name in func_defaults[self.dist_type] for name in dist_vals)):
+            self.dist_vals = dist_vals
+        else:
+            print('WARNING: dist_vals provided not supported')
 
         self.n = n
 
