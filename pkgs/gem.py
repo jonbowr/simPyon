@@ -671,7 +671,7 @@ class line_draw:
         self.fig.canvas.mpl_disconnect(self.cidmotion)
         print('We are Disconnected: Press Any key to continue')
 
-def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
+def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
     #==============================================================================
     # Function find surface: identifies electrode surface and normal direction
     # input:
@@ -687,6 +687,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
             smoot[-1]=np.nanmean([arr[-1],arr[-2]])
             arr=smoot
         return(arr)
+
 
     from scipy.interpolate import interp1d
     if img == []:
@@ -708,7 +709,6 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
     og_verts = poly_verts.copy() 
     og_L = np.sum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
                                      axis = 1)))
-    # pts_mm = 5
     got_edge = np.zeros(len(poly_verts)).astype(bool)
 
     print('press any key to grow, q to quit')
@@ -722,6 +722,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
         f_got = interp1d(L,got_edge,kind = 'linear')
 
         poly_verts = np.zeros((int(L[-1]*pts_mm),2))
+        # poly_verts = np.zeros((len(og_verts)*w,2))
         poly_verts[:,0] = fx(np.linspace(min(L),max(L),len(poly_verts)))
         poly_verts[:,1] = fy(np.linspace(min(L),max(L),len(poly_verts)))
         got_edge = f_got(np.linspace(min(L),max(L),len(poly_verts))).round().astype(bool)
@@ -739,10 +740,13 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
         dx = np.sin(ang)*d
         dy = np.cos(ang)*d
         
+        e_dx = np.sin(ang)*edge_buff
+        e_dy = np.cos(ang)*edge_buff
+        
         got_edge = np.logical_or(got_edge,
                                  np.logical_or(\
-                                img[((poly_verts[:,1] + dy)*pxls_mm).round().astype(int),
-                                ((poly_verts[:,0] - dx)*pxls_mm).round().astype(int)],
+                                img[((poly_verts[:,1] + e_dy)*pxls_mm).round().astype(int),
+                                ((poly_verts[:,0] - e_dx)*pxls_mm).round().astype(int)],
                                 img[((poly_verts[:,1])*pxls_mm).round().astype(int),
                                 ((poly_verts[:,0])*pxls_mm).round().astype(int)]))
 
@@ -751,6 +755,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
 
 
         polyline.set_xy(poly_verts)
+
         w+=1
         fig.canvas.draw()
         fig.canvas.flush_events()
@@ -758,11 +763,29 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5):
 
         
     print(w)
+
+    L = np.zeros(len(poly_verts)) 
+    L[1:] = np.cumsum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
+                                 axis = 1)))
     garb,unique_edge = np.unique(np.round(poly_verts[got_edge]*pts_mm),
                                  axis = 0,return_index = True)
-    edge_verts = poly_verts[got_edge][unique_edge] 
+    edge_verts = poly_verts[got_edge][unique_edge][np.argsort(L[got_edge][unique_edge])]
+
+    # get the normal direction of the surface points 
     edge_dx,edge_dy = get_gem_edge_norm(gemfile,edge_verts,pxls_mm,img.T, show = False)
     edge_ang = np.arctan2(edge_dy,edge_dx)
+
+    # Add nanvalues to discontinuous points aroudn the surface helps with interpolation
+    L = np.zeros(len(edge_verts)) 
+    L[1:] = np.cumsum(np.sqrt(np.sum((edge_verts[1:,:]-edge_verts[:-1,:])**2,
+                                 axis = 1)))
+    dl = np.zeros(len(L))
+    dl[1:] = L[1:]-L[:-1]
+    dis = np.argwhere(dl>d*pts_mm).flatten()
+    edge_verts = np.insert(edge_verts,dis,np.nan,axis = 0)
+    edge_ang = np.insert(edge_ang,dis,np.nan)
+    
+    ax.plot(edge_verts[:,0],edge_verts[:,1])
     return(edge_verts,edge_ang)
 
 def get_gem_edge_norm(gemfil,verts,pxls_mm,gem_img=[],show = True,grad_num = 5):
