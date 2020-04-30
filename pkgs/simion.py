@@ -397,7 +397,7 @@ class simion:
         ax1.set_xlabel('x [mm]')
         if self.data != [] and collision_locs ==True:
 
-            ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.')
+            ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.',color = 'red')
             ax1.plot(self.data.good().stop()['x'],self.data.good().stop()['r'],'.',color = 'blue')
 
             fig,ax2 = plt.subplots(1)
@@ -416,7 +416,7 @@ class simion:
             def circ(r,x_vec):
                 return(np.sqrt(r**2 - x_vec**2))
 
-            for r in [R_MIN,R_MAX]:
+            for r in [self.data.obs['R_MIN'],self.data.obs['R_MAX']]:
                 x_min =circ(r,min(ybins)) 
                 x = np.linspace(-x_min,x_min,100)
                 ax2.plot(x,circ(r,x), color = 'black')

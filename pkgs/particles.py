@@ -265,6 +265,11 @@ class source:
     def __str__(self):
         return(str([self.dist_type,self.dist_vals]))
 
+    def __getitem__(self,item):
+        return(self.dist_vals[item])
+
+    def __setitem__(self,item,value):
+        self.dist_vals[item] = value
 
 class auto_parts:
     
