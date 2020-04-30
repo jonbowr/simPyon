@@ -5,8 +5,8 @@ from skimage import feature
 from skimage import measure
 from matplotlib import pyplot as plt
 from matplotlib import widgets
-from shapely.geometry import Polygon as spoly
-from shapely.geometry import MultiPolygon as mpoly
+# from shapely.geometry import Polygon as spoly
+# from shapely.geometry import MultiPolygon as mpoly
 from matplotlib.patches import Polygon,Ellipse
 from matplotlib.collections import PatchCollection
 from matplotlib import path
@@ -372,27 +372,27 @@ def get_verts(gem_file):
                 m += 1
             elec_count += 1
         n += 1
-    # using the calculated verts, clip the excludes
-    elec_clip = {}
-    for nam in electrodes:
-        elec_clip[nam] = []
-        elec_poly = []
-        for part in electrodes[nam]:
-            poly_part = spoly([[p[0],p[1]] for p in part])
-            part_max = np.max(part,axis = 0)
-            part_min = np.min(part,axis = 0)
-            for clip in excludes[nam]:
-                clip_poly = spoly([[p[0],p[1]] for p in clip])
-                if poly_part.intersects(clip_poly) ==True:
-                    x,y = clip_poly.exterior.coords.xy
-                    # plt.plot(x,y)
-                    poly_part=(poly_part.difference(clip_poly))
-            elec_poly.append(poly_part)
+    # using the calculated verts, clip the excludes not really working
+    # elec_clip = {}
+    # for nam in electrodes:
+    #     elec_clip[nam] = []
+    #     elec_poly = []
+    #     for part in electrodes[nam]:
+    #         poly_part = spoly([[p[0],p[1]] for p in part])
+    #         part_max = np.max(part,axis = 0)
+    #         part_min = np.min(part,axis = 0)
+    #         for clip in excludes[nam]:
+    #             clip_poly = spoly([[p[0],p[1]] for p in clip])
+    #             if poly_part.intersects(clip_poly) ==True:
+    #                 x,y = clip_poly.exterior.coords.xy
+    #                 # plt.plot(x,y)
+    #                 poly_part=(poly_part.difference(clip_poly))
+    #         elec_poly.append(poly_part)
 
-        for ppart in list(mpoly(elec_poly)):
-            x,y = ppart.exterior.coords.xy
-            elec_clip[nam].append(np.stack([x,y]).T)
-    return(elec_clip,excludes)
+    #     for ppart in list(mpoly(elec_poly)):
+    #         x,y = ppart.exterior.coords.xy
+    #         elec_clip[nam].append(np.stack([x,y]).T)
+    return(electrodes,excludes)
 
 def gem_relocate(fil_in,fil_out):
     def find_all(a_str, sub):
@@ -626,6 +626,7 @@ def check_voltage(gemfile,volts):
 
 
 def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
+    from ipython.display import clear_output
     #==============================================================================
     # Function find surface: identifies electrode surface and normal direction
     # input:
@@ -650,7 +651,9 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
 
     fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
     
-    line = meat.line_draw(fig,ax).connect()
+    lin_drw = meat.line_draw(fig,ax).connect()
+    input('Hit a key when done drawing')
+    line =lin_drw.lines[-1]
     line.set_solid_capstyle('round')
     line_verts = np.stack(line.get_data()).T
     poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
