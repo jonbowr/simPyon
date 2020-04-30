@@ -14,8 +14,6 @@ from mpl_toolkits import mplot3d
 import time
 from . import fig_measure as meat
 from matplotlib import style
-# style.use('default')
-# import plotly as pltly
 plt.ion()
 
 def find_all(a_str, sub):
@@ -627,50 +625,6 @@ def check_voltage(gemfile,volts):
     return(elec_check)
 
 
-class line_draw:
-    def __init__(self,fig,ax):
-        self.fig = fig
-        self.ax = ax
-        self.line = self.ax.plot([0,0],[0,0])[0]
-        self.clickd = False
-
-    def connect(self):
-        print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
-        self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
-        self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
-        self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
-        input('')
-        return(self.line)
-    
-    def onclick(self,event):
-        if plt.get_current_fig_manager().toolbar.mode != '': return
-        
-        if event.xdata != None and event.ydata !=None:
-            self.clickd = True
-            self.line.set_xdata(event.xdata)
-            self.line.set_ydata(event.ydata)
-            self.fig.canvas.draw()
-            self.fig.canvas.flush_events()
-        elif event.ydata == None and event.dblclick == True:
-            self.disconnect()
-
-    def on_motion(self,event):
-        if self.clickd:
-            self.line.set_xdata(np.append(self.line.get_xdata(),np.array(event.xdata)))
-            self.line.set_ydata(np.append(self.line.get_ydata(),np.array(event.ydata)))
-            
-            self.fig.canvas.draw()
-            self.fig.canvas.flush_events()
-    
-    def on_release(self,event):
-        self.clickd = False
-
-    def disconnect(self):
-        self.fig.canvas.mpl_disconnect(self.cidpress)
-        self.fig.canvas.mpl_disconnect(self.cidrelease)
-        self.fig.canvas.mpl_disconnect(self.cidmotion)
-        print('We are Disconnected: Press Any key to continue')
-
 def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
     #==============================================================================
     # Function find surface: identifies electrode surface and normal direction
@@ -696,7 +650,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
 
     fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
     
-    line = line_draw(fig,ax).connect()
+    line = meat.line_draw(fig,ax).connect()
     line.set_solid_capstyle('round')
     line_verts = np.stack(line.get_data()).T
     poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))

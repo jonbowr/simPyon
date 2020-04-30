@@ -102,11 +102,18 @@ class pdf:
     def log(x):
         return(1/x)
 
+    def secondary_elec(x):
+        a0 = .4286
+        a1 = -4.544
+        k = (a0-a1)**3*4**4/3**3
+        return(k*(x-a0)/(x-a1)**4)
+
     func_dict = {
                 'sputtered':sputtered,
                 'cos':cos,
                 'poinsson': poisson,
-                'log': log
+                'log': log,
+                'secondary_elec':secondary_elec
                 }
 
     def __init__(self,f='sputtered'):
@@ -119,10 +126,11 @@ class pdf:
         # if log_space == True:
         #     x = np.logspace(np.log(a),np.log(b),n)
         # else:
-        x = np.linspace(a,b,n)
+        # x = np.linspace(a,b,n)
+        x = np.random.rand(n)*(b-a)+a
         y = self.f(x)
         select = np.repeat(x,abs(y/(max(y)-min(y))*n).astype(int))
-        return(np.random.choice(select,n))  
+        return(np.random.choice(select, n))  
 
 
 class source:
@@ -162,8 +170,9 @@ class source:
 
     def cos_coupled_vector(self,n):
         self.dist_vals['parent'].dist_vals['type'] = 'parent'
-        return((pdf('cos').sample(n)*180-180/2)+\
+        return((pdf('cos').sample(len(self.dist_vals['parent'].dist_vals['index']))*180-180/2)+\
                self.dist_vals['vector'][self.dist_vals['parent'].dist_vals['index']])
+        # return((pdf('cos').sample(len(self.dist_vals['parent'].dist_vals['index']))*180-180/2))
 
     def beam_2_poisson(self,n):
         return(self.dist_vals['E_beam']*abs(self.dist_vals['b']-pdf('poisson').sample(n,
@@ -176,8 +185,22 @@ class source:
         return(pdf('log').sample(n,
             self.dist_vals['min'],self.dist_vals['max']))
 
+    def coupled_func(self,n):
+        if self.dist_vals['type'] == 'parent':
+            # not going to reset to none type after initilaized
+            # if type(self.dist_vals['sample']) == 'NoneType':
+            self.dist_vals['sample'] = self.dist_vals['sample_func'](n)
+            return(self.dist_vals['f'](self.dist_vals['sample']))
+        elif self.dist_vals['type'] == 'child':
+            if self.dist_vals['parent'].dist_vals['sample'] is None:
+                self.dist_vals['parent'].dist_vals['sample'] = \
+                    self.dist_vals['sample_func'](n)
+            return(self.dist_vals['f'](self.dist_vals['parent'].dist_vals['sample']))
 
-    def __init__(self,dist_type='',n=1):
+    def secondary_elec(self,n):
+        return(pdf('secondary_elec').sample(n,self.dist_vals['a'],self.dist_vals['b']))
+    
+    def __init__(self,dist_type='',n=1,dist_vals = {}):
 
         func_dict = {'gaussian':self.gaussian,
                 'uniform':self.uniform,
@@ -190,7 +213,8 @@ class source:
                 'cos_coupled_vector':self.cos_coupled_vector,
                 'fixed_vector':self.fixed_vector,
                 'log_uniform':self.log_uniform,
-                }
+                'coupled_func':self.coupled_func,
+                'secondary_elec':self.secondary_elec}
 
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
@@ -207,21 +231,35 @@ class source:
                                 'type':'child'},
                 'fixed_vector':{'vector':np.linspace(0,1,1000)},
                 'log_uniform':{'min':0.01,'max':1},
-
+                'coupled_func':{'f':[],
+                                'sample_func':np.random.rand,
+                                'type':'child',
+                                'sample':None,
+                                'parent':None},
+                'secondary_elec':{'a':0,'b':50}
                 }
+
+        self.defaults = func_defaults
+        # if type(dist_type) == str:
         if dist_type == '':
             dist_type = 'uniform'
 
-        self.defaults = func_defaults
         self.dist_type = dist_type.lower()
         self.f = func_dict[self.dist_type]
-        self.dist_vals = func_defaults[self.dist_type]
+        if dist_vals == {}:
+            self.dist_vals = func_defaults[self.dist_type]
+        elif all(list(name in func_defaults[self.dist_type] for name in dist_vals)):
+            self.dist_vals = dist_vals
+        else:
+            print('WARNING: dist_vals provided not supported')
+
         self.n = n
 
     def __call__(self,n = []):
         if n != []:
             self.n = n
         self.dist_out = self.f(self.n)
+        # self.dist_out[np.isnan(self.dist_out)] = -999999999
         return(self.dist_out)
 
     def __str__(self):
@@ -298,6 +336,8 @@ class auto_parts:
         pos = self.pos.dist_out
         with open(self.fil, 'w') as fil:
             for n in range(len(ke)):
-                fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                    (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
-                     az[n],el[n],ke[n],1,1))
+                if np.sum(np.isnan(np.array([0,self.mass,self.charge,pos[n,0],pos[n,1],0,
+                     az[n],el[n],ke[n],1,1])))==0:
+                    fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
+                        (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
+                         az[n],el[n],ke[n],1,1))
