@@ -12,7 +12,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib import path
 from mpl_toolkits import mplot3d
 import time
-from . import fig_measure as meat
+from ./ import fig_measure as meat
 from matplotlib import style
 
 def log_grad(image):

@@ -179,9 +179,7 @@ class simion:
         dict_out = dict([(elec,volt_dict[elec]) for elec in volt_dict])
         volts = [(volt_dict[self.elect_dict[val]] if self.elect_dict[val] in volt_dict else 0)*\
         (scale_fact if val < 16 else 1) for val in self.elec_num]
-            # self.volt_dict = dict(volt_dict[self.elect_dict[val]]*\
-            # (scale_fact if val < 16 else 1) for val in self.elec_num)
-        # print(volts)
+
         if quiet == False:
             for val in self.elec_num:
                 print(self.elect_dict[val])
@@ -194,7 +192,7 @@ class simion:
         return(self)  
 
     def fly(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
-            quiet = False):
+            surpress_output = False):
         '''
         Fly n_parts particles using the particle probability distributions defined in self.parts. 
         Parallelizes the fly processes by spawing a number of instances associated with the
@@ -209,8 +207,8 @@ class simion:
         cores: int
             number of cores to use to process the fly particles request. Default initializes 
             a simion instance to run on each core. 
-        quiet: bool
-            With quiet == True, the preparation statement from one of the simion 
+        surpress_output: bool
+            With surpress_output == True, the preparation statement from one of the simion 
             instances is printed to cmd. 
         '''
 
@@ -218,12 +216,12 @@ class simion:
 
 
         # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,quiet,
+        outs = core_fly(self,n_parts,cores,surpress_output,
                         trajectory_quality =self.trajectory_quality)
-        data = str_data_scrape(outs,n_parts,cores,quiet)
+        data = str_data_scrape(outs,n_parts,cores,surpress_output)
         self.data = sim_data(data)
 
-        if quiet == False:
+        if surpress_output == False:
             print(time.time() - start_time)
 
         return(self)
@@ -248,7 +246,7 @@ class simion:
         print(time.time()-start_time)
 
     def particle_traj(self,n_parts = 100,cores = multiprocessing.cpu_count(),
-                      quiet = False, dat_step = 30,show= True,geo_3d = False):
+                      surpress_output = False, dat_step = 30,show= True,geo_3d = False):
         '''
         Fly n_parts particles, and plot their trajectories. Uses the particle probability 
         distributions defined in self.parts, but tracks the particle movement. 
@@ -264,8 +262,8 @@ class simion:
         cores: int
             number of cores to use to process the fly particles request. Default initializes 
             a simion instance to run on each core. 
-        quiet: bool
-            With quiet == True, the preparation statement from one of the simion 
+        surpress_output: bool
+            With surpress_output == True, the preparation statement from one of the simion 
             instances is printed to cmd. 
         '''
 
@@ -280,12 +278,12 @@ class simion:
 
         start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,quiet,
+        outs = core_fly(self,n_parts,cores,surpress_output,
                         rec_fil = self.home + 'simPyon_traj.rec',
                         markers = 20,trajectory_quality = 0)
-        data = str_data_scrape(outs,n_parts,cores,quiet)
+        data = str_data_scrape(outs,n_parts,cores,surpress_output)
         
-        if quiet == False:
+        if surpress_output == False:
             print(time.time() - start_time)
         
         # Parse the trajectory data into list of dictionaries
@@ -321,6 +319,7 @@ class simion:
                 for traj in self.traj_data:
                     ax.plot(traj['x'],-traj['z'],traj['y'])
                 ax.view_init(30, -70)
+
                 # ax.set_aspect('equal')
                 return(fig,ax)
         return(self)
@@ -365,8 +364,8 @@ class simion:
         check.kill()
         return check
     
-    def show(self,measure = False,mark=False,
-             annotate = False, origin = [0,0],collision_locs = False):
+    def show(self,measure = False,annotate = False, origin = [0,0],
+             collision_locs = False):
         '''
         Plots the geometry stored geometry file by scraping the gemfile for 
         polygon shape and renders them in pyplot using a collection of patches. 
@@ -387,69 +386,25 @@ class simion:
 
         '''
         fig,ax1 = gem.gem_draw_poly(self.gemfil,
-                                    measure = measure,
-                                    mark=mark,
                                     annotate = annotate,
                                     elec_names = self.elect_dict,
                                     origin = origin)
+        if measure == True:
+            from . import fig_measure as meat
+            fig,ax1 = meat.measure_buttons(fig,ax1)
+
         ax1.set_ylabel('$r=\sqrt{z^2 + y^2}$ [mm]')
         ax1.set_xlabel('x [mm]')
         if self.data != [] and collision_locs ==True:
 
-            
-            from scipy.interpolate import interpn
-
-            def density_scatter( x , y, ax = None, sort = True, bins = 20, **kwargs )   :
-                """
-                Scatter plot colored by 2d histogram
-                """
-                if ax is None :
-                    fig , ax = plt.subplots()
-                data , x_e, y_e = np.histogram2d( x, y, bins = bins)
-                z = interpn( ( 0.5*(x_e[1:] + x_e[:-1]) , 0.5*(y_e[1:]+y_e[:-1]) ) , data , 
-                            np.vstack([x,y]).T , method = "splinef2d", bounds_error = False )
-
-                # Sort the points by density, so that the densest points are plotted last
-                if sort :
-                    idx = z.argsort()
-                    x, y, z = x[idx], y[idx], z[idx]
-
-                ax.scatter( x, y, c=z, **kwargs )
-                return ax
-
-            # density_scatter(self.data.stop()['x'],self.data.stop()['r'],ax1,bins = 100)
             ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.')
             ax1.plot(self.data.good().stop()['x'],self.data.good().stop()['r'],'.',color = 'blue')
-            # for n in range(len(self.data.rf)):
-            #     ax1.plot([self.data.stop().good()['x'][n],128.2],
-            #     [self.data.stop().good()['r'][n],self.data.rf[n]])
-            # ax1.plot(self.data().stop()['x'],self.data().stop()()['r'],'.')
-            # Calculate the point density
-            # xy = np.vstack([self.data.good().start()()['x'],self.data.good().start()()['r']])
-            # z = gaussian_kde(xy)(xy)
-            # ax1.scatter(self.data.good().start()()['x'], self.data.good().start()()['r'],
-            #             c=z, s=100, edgecolor='')
-
-            # from scipy.stats import gaussian_kde
-            # xy = np.vstack([self.data.stop()['x'],self.data.stop()['r']])
-            # z = gaussian_kde(xy)(xy)
-            # ax1.scatter(self.data.stop()['x'], self.data.stop()['r'],
-            #             c=z, s=100, edgecolor='')
-
-
-            # all_h,all_x,all_y = np.histogram2d(self.data.stop()()['x'],
-            #     self.data.stop()()['r'], bins =int(400),
-            #     weights =self.data.stop()()['counts'])
-            # cs = plt.contour((all_x[1:]+all_x[:-1])/2,
-            #     (all_y[1:]+all_y[:-1])/2,all_h.T)
 
             fig,ax2 = plt.subplots(1)
             h,xbins,ybins = np.histogram2d(self.data.good().stop()()['z'],
                 self.data.good().stop()()['y'], bins =int(30/10000*len(self.data)/2),
                 weights =self.data.good().stop()()['counts'])
-            if TOF_MEASURE == True:
-                ax2.scatter(self.data.good_tof().stop()()['z'],
-                self.data.good_tof().stop()()['y'],color = 'red')
+
             ax2.scatter(self.data.good().stop()()['z'],
             self.data.good().stop()()['y'], color = 'blue')
             ax2.set_xlabel('z [mm]')
@@ -460,11 +415,8 @@ class simion:
 
             def circ(r,x_vec):
                 return(np.sqrt(r**2 - x_vec**2))
-            
-            r_max = 45.1
-            r_min = 35.4
 
-            for r in [r_min,r_max]:
+            for r in [R_MIN,R_MAX]:
                 x_min =circ(r,min(ybins)) 
                 x = np.linspace(-x_min,x_min,100)
                 ax2.plot(x,circ(r,x), color = 'black')
@@ -494,23 +446,12 @@ class simion:
         e_steps: 
         '''
         data = []
-        # upper_eng = np.copy(self.parts.ke.dist_vals['max'])
-        # volt_scale_factors = {1:.034735,
-        #               2:81.2/1212,
-        #               3:156/1212,
-        #               4:307/1212,
-        #               5:592/1212,
-        #               6:1,
-        #               7:1.93775}
         for scale in voltage_scale_factors:
             if volt_base_dict != {}:
                 self.fast_adjust(volt_base_dict,
                         scale_fact = scale)
             else:
                 self.fast_adjust(scale_fact = scale)
-            # if particle_scale != '':
-            #     self.parts.ke.dist_vals['max'] = \
-            #             e_max*scale
             data.append(self.fly(n_parts = n_parts).data)
         return(data)
 
@@ -556,7 +497,7 @@ class simion:
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
         return(s_volts)
 
-def str_data_scrape(outs,n_parts,cores,quiet):
+def str_data_scrape(outs,n_parts,cores,surpress_output):
     tot_lines = []
     j=0
     b = 0
@@ -569,7 +510,7 @@ def str_data_scrape(outs,n_parts,cores,quiet):
                 if start == True:
                     if line[0].isdigit(): 
                         out_line.append(np.fromstring(line,sep = ',')) 
-                elif j == 0 and quiet == False:print(line)
+                elif j == 0 and surpress_output == False:print(line)
             except(IndexError):
                 pass
             if "------ Begin Next Fly'm ------" in line:
@@ -588,7 +529,7 @@ def str_data_scrape(outs,n_parts,cores,quiet):
     data = np.stack(tot_lines)
     return(data)
 
-def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality = 3):
+def core_fly(sim,n_parts,cores,surpress_output,rec_fil = '',markers = 0,trajectory_quality = 3):
     checks = []
     fly_fils = []
     sim.parts.n = int(n_parts/cores)

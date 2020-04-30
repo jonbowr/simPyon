@@ -265,14 +265,7 @@ def gem_draw_poly(gem_file,measure = False,
     ax.set_aspect('equal')
     plt.show()
 
-    if measure == True:
-        # import fig_measure as meat
-        measur = meat.measure(fig,ax)
-        measur.connect()
-    elif mark==True:
-        mrk = meat.mark(fig,ax)
-        mrk.connect()
-    elif annotate ==True:
+    if annotate ==True:
         numbers = list(elec_center)
         locations = list(elec_center.values())
         bbox_props =dict(boxstyle="round", fc="w", ec="0.5", alpha=0.6)
@@ -280,8 +273,8 @@ def gem_draw_poly(gem_file,measure = False,
             nams = numbers
         else:
             nams = [elec_names[num] for num in numbers]
-        lab = meat.label(fig,ax,nams,locations)
-        lab.connect()
+        ax.label = meat.label(fig,ax,nams,locations)
+        ax.label.connect()
     if path_out == False:
         return(fig,ax)
     else:
@@ -626,7 +619,6 @@ def check_voltage(gemfile,volts):
 
 
 def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
-    from ipython.display import clear_output
     #==============================================================================
     # Function find surface: identifies electrode surface and normal direction
     # input:
@@ -716,7 +708,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
         w+=1
         fig.canvas.draw()
         fig.canvas.flush_events()
-        check = input()
+        check = input('press any key to grow, q to quit')
 
         
     print(w)
