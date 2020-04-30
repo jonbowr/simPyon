@@ -102,11 +102,18 @@ class pdf:
     def log(x):
         return(1/x)
 
+    def secondary_elec(x):
+        a0 = .4286
+        a1 = -4.544
+        k = (a0-a1)**3*4**4/3**3
+        return(k*(x-a0)/(x-a1)**4)
+
     func_dict = {
                 'sputtered':sputtered,
                 'cos':cos,
                 'poinsson': poisson,
-                'log': log
+                'log': log,
+                'secondary_elec':secondary_elec
                 }
 
     def __init__(self,f='sputtered'):
@@ -121,9 +128,9 @@ class pdf:
         # else:
         # x = np.linspace(a,b,n)
         x = np.random.rand(n)*(b-a)+a
-        # y = self.f(x)
-        # select = np.repeat(x,abs(y/(max(y)-min(y))*n).astype(int))
-        return(np.random.choice(x,weights = self.f(x),k = n))  
+        y = self.f(x)
+        select = np.repeat(x,abs(y/(max(y)-min(y))*n).astype(int))
+        return(np.random.choice(select, n))  
 
 
 class source:
@@ -185,12 +192,14 @@ class source:
             self.dist_vals['sample'] = self.dist_vals['sample_func'](n)
             return(self.dist_vals['f'](self.dist_vals['sample']))
         elif self.dist_vals['type'] == 'child':
-            # if type(self.dist_vals['parent'].dist_vals['sample']) == 'NoneType':
-                # self.dist_vals['parent'].dist_vals['sample'] = \
-                    # self.dist_vals['sample_func'](n)
+            if self.dist_vals['parent'].dist_vals['sample'] is None:
+                self.dist_vals['parent'].dist_vals['sample'] = \
+                    self.dist_vals['sample_func'](n)
             return(self.dist_vals['f'](self.dist_vals['parent'].dist_vals['sample']))
 
-
+    def secondary_elec(self,n):
+        return(pdf('secondary_elec').sample(n,self.dist_vals['a'],self.dist_vals['b']))
+    
     def __init__(self,dist_type='',n=1,dist_vals = {}):
 
         func_dict = {'gaussian':self.gaussian,
@@ -204,7 +213,8 @@ class source:
                 'cos_coupled_vector':self.cos_coupled_vector,
                 'fixed_vector':self.fixed_vector,
                 'log_uniform':self.log_uniform,
-                'coupled_func':self.coupled_func}
+                'coupled_func':self.coupled_func,
+                'secondary_elec':self.secondary_elec}
 
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
@@ -225,7 +235,8 @@ class source:
                                 'sample_func':np.random.rand,
                                 'type':'child',
                                 'sample':None,
-                                'parent':None}
+                                'parent':None},
+                'secondary_elec':{'a':0,'b':50}
                 }
 
         self.defaults = func_defaults
@@ -248,6 +259,7 @@ class source:
         if n != []:
             self.n = n
         self.dist_out = self.f(self.n)
+        # self.dist_out[np.isnan(self.dist_out)] = -999999999
         return(self.dist_out)
 
     def __str__(self):
@@ -324,6 +336,8 @@ class auto_parts:
         pos = self.pos.dist_out
         with open(self.fil, 'w') as fil:
             for n in range(len(ke)):
-                fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                    (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
-                     az[n],el[n],ke[n],1,1))
+                if np.sum(np.isnan(np.array([0,self.mass,self.charge,pos[n,0],pos[n,1],0,
+                     az[n],el[n],ke[n],1,1])))==0:
+                    fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
+                        (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
+                         az[n],el[n],ke[n],1,1))

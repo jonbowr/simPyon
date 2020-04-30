@@ -194,7 +194,7 @@ class simion:
         return(self)  
 
     def fly(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
-            surpress_output = False):
+            quiet = False):
         '''
         Fly n_parts particles using the particle probability distributions defined in self.parts. 
         Parallelizes the fly processes by spawing a number of instances associated with the
@@ -209,8 +209,8 @@ class simion:
         cores: int
             number of cores to use to process the fly particles request. Default initializes 
             a simion instance to run on each core. 
-        surpress_output: bool
-            With surpress_output == True, the preparation statement from one of the simion 
+        quiet: bool
+            With quiet == True, the preparation statement from one of the simion 
             instances is printed to cmd. 
         '''
 
@@ -218,12 +218,12 @@ class simion:
 
 
         # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,surpress_output,
+        outs = core_fly(self,n_parts,cores,quiet,
                         trajectory_quality =self.trajectory_quality)
-        data = str_data_scrape(outs,n_parts,cores,surpress_output)
+        data = str_data_scrape(outs,n_parts,cores,quiet)
         self.data = sim_data(data)
 
-        if surpress_output == False:
+        if quiet == False:
             print(time.time() - start_time)
 
         return(self)
@@ -248,7 +248,7 @@ class simion:
         print(time.time()-start_time)
 
     def particle_traj(self,n_parts = 100,cores = multiprocessing.cpu_count(),
-                      surpress_output = False, dat_step = 30,show= True,geo_3d = False):
+                      quiet = False, dat_step = 30,show= True,geo_3d = False):
         '''
         Fly n_parts particles, and plot their trajectories. Uses the particle probability 
         distributions defined in self.parts, but tracks the particle movement. 
@@ -264,8 +264,8 @@ class simion:
         cores: int
             number of cores to use to process the fly particles request. Default initializes 
             a simion instance to run on each core. 
-        surpress_output: bool
-            With surpress_output == True, the preparation statement from one of the simion 
+        quiet: bool
+            With quiet == True, the preparation statement from one of the simion 
             instances is printed to cmd. 
         '''
 
@@ -280,12 +280,12 @@ class simion:
 
         start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,surpress_output,
+        outs = core_fly(self,n_parts,cores,quiet,
                         rec_fil = self.home + 'simPyon_traj.rec',
                         markers = 20,trajectory_quality = 0)
-        data = str_data_scrape(outs,n_parts,cores,surpress_output)
+        data = str_data_scrape(outs,n_parts,cores,quiet)
         
-        if surpress_output == False:
+        if quiet == False:
             print(time.time() - start_time)
         
         # Parse the trajectory data into list of dictionaries
@@ -556,7 +556,7 @@ class simion:
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
         return(s_volts)
 
-def str_data_scrape(outs,n_parts,cores,surpress_output):
+def str_data_scrape(outs,n_parts,cores,quiet):
     tot_lines = []
     j=0
     b = 0
@@ -569,7 +569,7 @@ def str_data_scrape(outs,n_parts,cores,surpress_output):
                 if start == True:
                     if line[0].isdigit(): 
                         out_line.append(np.fromstring(line,sep = ',')) 
-                elif j == 0 and surpress_output == False:print(line)
+                elif j == 0 and quiet == False:print(line)
             except(IndexError):
                 pass
             if "------ Begin Next Fly'm ------" in line:
@@ -588,7 +588,7 @@ def str_data_scrape(outs,n_parts,cores,surpress_output):
     data = np.stack(tot_lines)
     return(data)
 
-def core_fly(sim,n_parts,cores,surpress_output,rec_fil = '',markers = 0,trajectory_quality = 3):
+def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality = 3):
     checks = []
     fly_fils = []
     sim.parts.n = int(n_parts/cores)
