@@ -312,6 +312,43 @@ def get_canvas(gem_file):
             break
     return(canvas_size,pxls_mm)
 
+def get_pa_info(gem_file):
+    with open(gem_file) as lines:
+        file_lines = lines.readlines()
+
+    reloc = []
+    new_lines = ['']*len(file_lines)
+
+    i = 0
+    # clean the file of comments,spaces and black lines
+    for line in file_lines:
+        line = line[:line.find(';')].strip('\n').strip(' ')
+        if line != '':
+            if line.find(',') !=-1 and line[-1] ==',':
+                new_lines[i]+=line.strip(' ')
+            else:
+                new_lines[i]+=line.strip(' ')
+                i+=1
+    for line,n in zip(new_lines,range(len(new_lines))):
+        if line == '':
+            del(new_lines[i])
+
+
+    for line in new_lines:
+        if line.lower()[:line.find(';')].find('pa_define') != -1:
+            info = within(line,'(',')').split(',')
+            canvas_info = {'Lx':int(info[0]),
+                           'Ly':int(info[1]),
+                           'Lz':int(info[2]),
+                           'symmetry':info[3].strip(),
+                           'mirroring': info[4].strip()[0],
+                           'base':{'x':'y','y':'x'}[info[4].strip()[0]]
+                           }
+        if line.lower()[:line.find(';')].find('locate') != -1:
+            canvas_info['pxls_mm'] = np.fromstring(within(line,'(',')'),sep =',')[-1]
+            break
+    return(canvas_info)
+
 def get_verts(gem_file):
     with open(gem_file) as lines:
         file_lines = lines.readlines()

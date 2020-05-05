@@ -19,40 +19,52 @@ def log_stops(ion_num):
 
 class sim_data:
 
-    def __init__(self, data):
+    def __init__(self, data,
+                 headder = ["Ion N","TOF","X","Y","Z",
+                            "Azm","Elv","Vx","Vy","Vz","KE"],
+                 symmetry='cylindrical',
+                 mirroring='y'):
         self.data = data
-        self.header = ["Ion N","TOF","X","Y","Z",
-        "Azm","Elv","Vx","Vy","Vz","KE"]
+        self.header = headder
         self.df = {}
         for head, arr in zip(self.header, np.transpose(data)):
             self.df[head.lower()] = arr
-            
-        #define the cylindrical symmetry coords
-        self.df['r'] = np.sqrt(self.df['z']**2 + self.df['y']**2)
-        self.df['omega'] = np.arctan2(self.df['z'],self.df['y'])
-        self.df['omega'][self.df['omega']<0] += 360 
-        vr = (self.df['z']*self.df['vz']+self.df['y']*self.df['vy'])/\
-                np.sqrt(self.df['z']**2 + self.df['y']**2)
-        self.df['vr'] = vr
-        vtheta = (self.df['z']*self.df['vy']-\
-            self.df['y']*self.df['vz'])/\
-            np.sqrt(self.df['z']**2 + self.df['y']**2)
-        self.df['vtheta'] = vtheta
-        self.df['theta'] = np.arctan2(vr,np.sqrt(self.df['vx']**2+self.df['vtheta']**2))*180/np.pi
-        self.df['phi'] = np.arctan2(vtheta,self.df['vx'])*180/np.pi
+        
+        base = {'x':'y','y':'x'}
+        self.symmetry = symmetry
+        self.mirror_ax = mirroring
+        self.base_ax = base[mirroring]
+        if symmetry == 'cylindrical':
+            ax_mir = self.df[mirroring]
+            vmir = self.df['v'+mirroring]
+            ax_base = self.df[base[mirroring]]
+            vbase = self.df['v'+base[mirroring]]
+            #define the cylindrical symmetry coords
+            self.df['r'] = np.sqrt(self.df['z']**2 + ax_mir**2)
+            self.df['omega'] = np.arctan2(self.df['z'],ax_mir)
+            self.df['omega'][self.df['omega']<0] += 360 
+            vr = (self.df['z']*self.df['vz'] +ax_mir*vmir)/\
+                    np.sqrt(self.df['z']**2 +ax_mir**2)
+            self.df['vr'] = vr
+            vtheta = (self.df['z']*vmir-\
+               ax_mir*self.df['vz'])/\
+                np.sqrt(self.df['z']**2 +ax_mir**2)
+            self.df['vtheta'] = vtheta
+            self.df['theta'] = np.arctan2(vr,np.sqrt(vbase**2+self.df['vtheta']**2))*180/np.pi
+            self.df['phi'] = np.arctan2(vtheta,vbase)*180/np.pi
 
-        # fix the count rate for increase in CS counts with radius
-        if R_WEIGHT == True:
-            self.df['counts'] = np.zeros(len(self.df['x']))
-            if len(data)!=0:
-                starts = log_starts(self.df['ion n'])
-                stops = log_stops(self.df['ion n'])
-                starty = min(self.df['r'][starts])
-                self.df['counts'][starts] = self.df['r'][starts] / starty
-                self.df['counts'][starts] = self.df['counts'][starts] * \
-                    len(self.df['x'][starts]) /\
-                    np.sum(self.df['counts'][starts])
-                self.df['counts'][stops][:] = self.df['counts'][starts]
+            # fix the count rate for increase in CS counts with radius
+            if R_WEIGHT == True:
+                self.df['counts'] = np.zeros(len(ax_base))
+                if len(data)!=0:
+                    starts = log_starts(self.df['ion n'])
+                    stops = log_stops(self.df['ion n'])
+                    starty = min(self.df['r'][starts])
+                    self.df['counts'][starts] = self.df['r'][starts] / starty
+                    self.df['counts'][starts] = self.df['counts'][starts] * \
+                        len(ax_base[starts]) /\
+                        np.sum(self.df['counts'][starts])
+                    self.df['counts'][stops][:] = self.df['counts'][starts]
 
         # load the detection parameters From defaults so they can be actively updated
         self.obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
@@ -84,8 +96,8 @@ class sim_data:
 
     def good(self):
         stops = log_stops(self.df['ion n'])
-        gx = np.logical_and(self.df['x'][stops] > self.obs['X_MIN'],
-                    self.df['x'][stops] < self.obs['X_MAX'])
+        gx = np.logical_and(self.df[self.base_ax][stops] > self.obs['X_MIN'],
+                    self.df[self.base_ax][stops] < self.obs['X_MAX'])
         gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
                     self.df['r'][stops] > self.obs['R_MIN']) 
         goot = np.logical_and(gx, gy)
@@ -97,8 +109,8 @@ class sim_data:
 
     def not_good(self):
         stops = log_stops(self.df['ion n'])
-        gx = np.logical_and(self.df['x'][stops] > self.obs['X_MIN'],
-                    self.df['x'][stops] < self.obs['X_MAX'])
+        gx = np.logical_and(self.df[self.base_ax][stops] > self.obs['X_MIN'],
+                    self.df[self.base_ax][stops] < self.obs['X_MAX'])
         gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
                     self.df['r'][stops] > self.obs['R_MIN']) 
         goot = np.logical_and(gx, gy)

@@ -59,7 +59,8 @@ class simion:
         distribution of source particles 
     '''
     def __init__(self,volt_dict = {},home = './',
-                 gemfil = '',recfil = '',traj_recfil = '',bench = ''):
+                 gemfil = '',recfil = '',traj_recfil = '',
+                 bench = ''):
         self.commands = []
         self.home = home
         self.sim = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
@@ -103,6 +104,7 @@ class simion:
         self.name = gemfil.upper().strip('.GEM')
         #scrape the gemfile for numbers
         self.get_elec_nums_gem()
+        self.pa_info = gem.get_pa_info(self.gemfil)
 
 
     def gem2pa(self,pa):
@@ -219,33 +221,16 @@ class simion:
         outs = core_fly(self,n_parts,cores,surpress_output,
                         trajectory_quality =self.trajectory_quality)
         data = str_data_scrape(outs,n_parts,cores,surpress_output)
-        self.data = sim_data(data)
+        self.data = sim_data(data,symmetry = self.pa_info['symmetry'],
+                                    mirroring = self.pa_info['mirroring'])
 
         if surpress_output == False:
             print(time.time() - start_time)
 
         return(self)
 
-    def old_fly(self,outfile, bench, particles = [],remove = True):
-        '''
-        Original version of the fly command that uses simion declared particle 
-        distributions to fly
-        '''
-        loc_com = r"fly --recording-output="+outfile+\
-        r" --retain-trajectories=0 --restore-potentials=0"
-        if particles != []:
-            loc_com += r" --particles=" + particles
-        loc_com += r" %s"%bench
-            
-        if remove == True:
-            if os.path.isfile(outfile)==True:
-                os.remove(outfile)
-        self.commands = loc_com
-        start_time = time.time()
-        self.run()
-        print(time.time()-start_time)
 
-    def particle_traj(self,n_parts = 100,cores = multiprocessing.cpu_count(),
+    def fly_trajectory(self,n_parts = 100,cores = multiprocessing.cpu_count(),
                       surpress_output = False, dat_step = 30,show= True,geo_3d = False):
         '''
         Fly n_parts particles, and plot their trajectories. Uses the particle probability 
@@ -294,14 +279,14 @@ class simion:
 
         # calculate the r position vec
         for dat in self.traj_data:
-            dat['r'] = np.sqrt(dat['z']**2+dat['y']**2)
+            dat['r'] = np.sqrt(dat['z']**2+dat[self.pa_info['mirroring']]**2)
 
         # Plot the trajectories
         if show == True:
             if geo_3d == False:
                 fig,ax = self.show()
                 for traj in self.traj_data:
-                    ax.plot(traj['x'],traj['r'])
+                    ax.plot(traj[self.pa_info['base']],traj['r'])
             if geo_3d == True:
                 from mpl_toolkits.mplot3d import Axes3D,art3d
                 fig = plt.figure()
@@ -529,7 +514,8 @@ def str_data_scrape(outs,n_parts,cores,surpress_output):
     data = np.stack(tot_lines)
     return(data)
 
-def core_fly(sim,n_parts,cores,surpress_output,rec_fil = '',markers = 0,trajectory_quality = 3):
+def core_fly(sim,n_parts,cores,surpress_output,rec_fil = '',
+                    markers = 0,trajectory_quality = 3):
     checks = []
     fly_fils = []
     sim.parts.n = int(n_parts/cores)
