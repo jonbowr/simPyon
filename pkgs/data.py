@@ -34,7 +34,8 @@ class sim_data:
         self.symmetry = symmetry
         self.mirror_ax = mirroring
         self.base_ax = base[mirroring]
-        if symmetry == 'cylindrical':
+        if symmetry.lower() == 'cylindrical'\
+                 or symmetry.lower() =='cyl':
             ax_mir = self.df[mirroring]
             vmir = self.df['v'+mirroring]
             ax_base = self.df[base[mirroring]]

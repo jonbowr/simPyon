@@ -342,7 +342,7 @@ def get_pa_info(gem_file):
                            'Lz':int(info[2]),
                            'symmetry':info[3].strip(),
                            'mirroring': info[4].strip()[0],
-                           'base':{'x':'y','y':'x'}[info[4].strip()[0]]
+                           'base':{'x':'y','y':'x'}[info[4].strip()[0].lower()]
                            }
         if line.lower()[:line.find(';')].find('locate') != -1:
             canvas_info['pxls_mm'] = np.fromstring(within(line,'(',')'),sep =',')[-1]
