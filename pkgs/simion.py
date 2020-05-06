@@ -418,7 +418,7 @@ class simion:
                 return ax
 
             # density_scatter(self.data.stop()['x'],self.data.stop()['r'],ax1,bins = 100)
-            ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.')
+            ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.',color = 'r')
             ax1.plot(self.data.good().stop()['x'],self.data.good().stop()['r'],'.',color = 'blue')
             # for n in range(len(self.data.rf)):
             #     ax1.plot([self.data.stop().good()['x'][n],128.2],
