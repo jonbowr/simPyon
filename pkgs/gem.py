@@ -340,8 +340,8 @@ def get_pa_info(gem_file):
             canvas_info = {'Lx':int(info[0]),
                            'Ly':int(info[1]),
                            'Lz':int(info[2]),
-                           'symmetry':info[3].strip(),
-                           'mirroring': info[4].strip()[0],
+                           'symmetry':info[3].strip().lower(),
+                           'mirroring': info[4].strip()[0].lower(),
                            'base':{'x':'y','y':'x'}[info[4].strip()[0].lower()]
                            }
         if line.lower()[:line.find(';')].find('locate') != -1:
