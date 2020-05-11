@@ -76,7 +76,7 @@ class sim_data:
                         self.df['counts'][stops][:] = self.df['counts'][starts]
 
         elif str(type(data)) == str(type(self)):
-            self.header = list(data.df.keys)
+            self.header = list(data.df.keys())
             self.df = {}
             for head, arr in data.df.items():
                 self.df[head.lower()] = arr
