@@ -59,7 +59,8 @@ class simion:
         distribution of source particles 
     '''
     def __init__(self,volt_dict = {},home = './',
-                 gemfil = '',recfil = '',traj_recfil = '',
+                 gemfil = '',recfil = '',
+                 traj_recfil = '',
                  bench = ''):
         self.commands = []
         self.home = home
@@ -350,7 +351,7 @@ class simion:
         return check
     
     def show(self,measure = False,annotate = False, origin = [0,0],
-             collision_locs = False):
+             collision_locs = False,fig = [],ax = []):
         '''
         Plots the geometry stored geometry file by scraping the gemfile for 
         polygon shape and renders them in pyplot using a collection of patches. 
@@ -370,9 +371,11 @@ class simion:
             Point in the simmetry plane to shift the origin to for the displayed geometry. 
 
         '''
-        fig,ax1 = gem.gem_draw_poly(self.gemfil,
-                                    annotate = annotate,
-                                    elec_names = self.elect_dict,
+        from .poly_gem import draw
+        fig,ax1 = draw(self.gemfil,canvas = [self.pa_info['Lx'],
+                                    self.pa_info['Ly']],
+                                    fig = fig, ax = ax,
+                                    mirror_ax = self.pa_info['mirroring'],
                                     origin = origin)
         if measure == True:
             from . import fig_measure as meat
