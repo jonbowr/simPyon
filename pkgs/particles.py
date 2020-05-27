@@ -199,6 +199,15 @@ class source:
 
     def secondary_elec(self,n):
         return(pdf('secondary_elec').sample(n,self.dist_vals['a'],self.dist_vals['b']))
+
+    def circle_pos(self,n):
+        angs = np.random.rand(n)*(self.dist_vals['max_ang']-\
+                                  self.dist_vals['min_ang'])+\
+                                    self.dist_vals['min_ang']
+        dx = np.cos(angs*np.pi/180)*self.dist_vals['r']
+        dy = np.sin(angs*np.pi/180)*self.dist_vals['r']
+        return(np.stack([dx+self.dist_vals['origin'][0],
+                        dy+self.dist_vals['origin'][1]]).T)
     
     def __init__(self,dist_type='',n=1,dist_vals = {}):
 
@@ -214,7 +223,8 @@ class source:
                 'fixed_vector':self.fixed_vector,
                 'log_uniform':self.log_uniform,
                 'coupled_func':self.coupled_func,
-                'secondary_elec':self.secondary_elec}
+                'secondary_elec':self.secondary_elec,
+                'circle_pos':self.circle_pos}
 
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
@@ -236,7 +246,11 @@ class source:
                                 'type':'child',
                                 'sample':None,
                                 'parent':None},
-                'secondary_elec':{'a':0,'b':50}
+                'secondary_elec':{'a':0,'b':50},
+                'circle_pos':{'origin':np.array([0,0]),
+                                'r':10,
+                                'min_ang':0,
+                                'max_ang':90}
                 }
 
         self.defaults = func_defaults
@@ -265,6 +279,11 @@ class source:
     def __str__(self):
         return(str([self.dist_type,self.dist_vals]))
 
+    def __getitem__(self,item):
+        return(self.dist_vals[item])
+
+    def __setitem__(self,item,value):
+        self.dist_vals[item] = value
 
 class auto_parts:
     

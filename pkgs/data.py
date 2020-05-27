@@ -19,51 +19,77 @@ def log_stops(ion_num):
 
 class sim_data:
 
-    def __init__(self, data):
-        self.data = data
-        self.header = ["Ion N","TOF","X","Y","Z",
-        "Azm","Elv","Vx","Vy","Vz","KE"]
-        self.df = {}
-        for head, arr in zip(self.header, np.transpose(data)):
-            self.df[head.lower()] = arr
+    def __init__(self, data,
+                 headder = ["Ion N","TOF","X","Y","Z",
+                            "Azm","Elv","Vx","Vy","Vz","KE"],
+                 symmetry='cylindrical',
+                 mirroring='y'):
+
+        if type(data) is np.ndarray:
+            self.header = headder
+            self.df = {}
+            for head, arr in zip(self.header, np.transpose(data)):
+                self.df[head.lower()] = arr
             
-        #define the cylindrical symmetry coords
-        self.df['r'] = np.sqrt(self.df['z']**2 + self.df['y']**2)
-        self.df['omega'] = np.arctan2(self.df['z'],self.df['y'])
-        self.df['omega'][self.df['omega']<0] += 360 
-        vr = (self.df['z']*self.df['vz']+self.df['y']*self.df['vy'])/\
-                np.sqrt(self.df['z']**2 + self.df['y']**2)
-        self.df['vr'] = vr
-        vtheta = (self.df['z']*self.df['vy']-\
-            self.df['y']*self.df['vz'])/\
-            np.sqrt(self.df['z']**2 + self.df['y']**2)
-        self.df['vtheta'] = vtheta
-        self.df['theta'] = np.arctan2(vr,np.sqrt(self.df['vx']**2+self.df['vtheta']**2))*180/np.pi
-        self.df['phi'] = np.arctan2(vtheta,self.df['vx'])*180/np.pi
+            base = {'x':'y','y':'x'}
+            mirroring = mirroring.lower()
+            symmetry = symmetry.lower()
+            self.symmetry = symmetry
+            self.mirror_ax = mirroring
+            self.base_ax = base[mirroring]
 
-        # fix the count rate for increase in CS counts with radius
-        if R_WEIGHT == True:
-            self.df['counts'] = np.zeros(len(self.df['x']))
-            if len(data)!=0:
-                starts = log_starts(self.df['ion n'])
-                stops = log_stops(self.df['ion n'])
-                starty = min(self.df['r'][starts])
-                self.df['counts'][starts] = self.df['r'][starts] / starty
-                self.df['counts'][starts] = self.df['counts'][starts] * \
-                    len(self.df['x'][starts]) /\
-                    np.sum(self.df['counts'][starts])
-                self.df['counts'][stops][:] = self.df['counts'][starts]
+            # load the detection parameters From defaults so they can be actively updated
+            self.obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
+                        'R_MAX':R_MAX,'R_MIN':R_MIN}
 
-        # load the detection parameters From defaults so they can be actively updated
-        self.obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
-                    'R_MAX':R_MAX,'R_MIN':R_MIN,
-                    'TOF_MEASURE':TOF_MEASURE}
+            if symmetry == 'cylindrical'\
+                     or symmetry =='cyl':
+                ax_mir = self.df[mirroring]
+                vmir = self.df['v'+mirroring]
+                ax_base = self.df[base[mirroring]]
+                vbase = self.df['v'+base[mirroring]]
+                #define the cylindrical symmetry coords
+                self.df['r'] = np.sqrt(self.df['z']**2 + ax_mir**2)
+                self.df['omega'] = np.arctan2(self.df['z'],ax_mir)
+                self.df['omega'][self.df['omega']<0] += 360 
+                vr = (self.df['z']*self.df['vz'] +ax_mir*vmir)/\
+                        np.sqrt(self.df['z']**2 +ax_mir**2)
+                self.df['vr'] = vr
+                vtheta = (self.df['z']*vmir-\
+                   ax_mir*self.df['vz'])/\
+                    np.sqrt(self.df['z']**2 +ax_mir**2)
+                self.df['vtheta'] = vtheta
+                self.df['theta'] = np.arctan2(vr,np.sqrt(vbase**2+self.df['vtheta']**2))*180/np.pi
+                self.df['phi'] = np.arctan2(vtheta,vbase)*180/np.pi
+
+                # fix the count rate for increase in CS counts with radius
+                if R_WEIGHT == True:
+                    self.df['counts'] = np.zeros(len(ax_base))
+                    if len(data)!=0:
+                        starts = log_starts(self.df['ion n'])
+                        stops = log_stops(self.df['ion n'])
+                        starty = min(self.df['r'][starts])
+                        self.df['counts'][starts] = self.df['r'][starts] / starty
+                        self.df['counts'][starts] = self.df['counts'][starts] * \
+                            len(ax_base[starts]) /\
+                            np.sum(self.df['counts'][starts])
+                        self.df['counts'][stops][:] = self.df['counts'][starts]
+
+        elif str(type(data)) == str(type(self)):
+            self.header = list(data.df.keys())
+            self.df = {}
+            for head, arr in data.df.items():
+                self.df[head.lower()] = arr
+            self.symmetry = data.symmetry
+            self.mirror_ax = data.mirror_ax
+            self.base_ax = data.base_ax
+            self.obs = data.obs
 
     def __call__(self):
         return(self.df)
 
     def __len__(self):
-        return(len(self.data))
+        return(len(list(self.df.values())[0]))
 
     def __iter__(self):
         return(iter(self.df))
@@ -71,35 +97,42 @@ class sim_data:
     def __getitem__(self,item):
         return(self.df[item])
 
+    def __setitem__(self,item,value):
+        self.df[item] = value
+
+
+    def data(self):
+        dat = []
+        head = []
+        for nam,vals in self.df.items():
+            head.append(nam)
+            dat.append(vals)
+        dat = np.stack(dat).T
+        self.header = head
+        return(dat)
+
+    def mask(self,mask):
+        cop = sim_data(self)
+        for nam in cop:
+            cop[nam] = cop[nam][mask]
+        return(cop)
+
     def throughput(self):
         return(np.sum(self.good().start().df['counts'])/\
             np.sum(self.start().df['counts']))
 
     def start(self):
         startz = log_starts(self.df['ion n'])
-        return(sim_data(self.data[startz]))
+        return(self.mask(startz))
 
     def stop(self):
         stopz = log_stops(self.df['ion n'])
-        return(sim_data(self.data[stopz]))
-
-    def good_tof(self):
-        gx = np.logical_and(self.df['x'][log_stops(self.df['ion n'])] < self.obs['X_MAX'],
-                            self.df['x'][log_stops(self.df['ion n'])] > self.obs['X_MIN'])
-
-        # self.df['x'][log_stops(self.df['ion n'])] > 72
-        gy = np.logical_and(self.df['r'][log_stops(self.df['ion n'])] < self.obs['R_MIN'],
-                            self.df['r'][log_stops(self.df['ion n'])] > self.obs['R_MAX'])
-        goot = np.logical_and(gx, gy)
-        good_ions = np.in1d(
-            self.df['ion n'], self.df['ion n'][
-                log_starts(self.df['ion n'])][goot])
-        return(sim_data(self.data[good_ions]))
+        return(self.mask(stopz))
 
     def good(self):
         stops = log_stops(self.df['ion n'])
-        gx = np.logical_and(self.df['x'][stops] > self.obs['X_MIN'],
-                    self.df['x'][stops] < self.obs['X_MAX'])
+        gx = np.logical_and(self.df[self.base_ax][stops] > self.obs['X_MIN'],
+                    self.df[self.base_ax][stops] < self.obs['X_MAX'])
         gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
                     self.df['r'][stops] > self.obs['R_MIN']) 
         goot = np.logical_and(gx, gy)
@@ -135,16 +168,20 @@ class sim_data:
         good_ions = np.in1d(
             self.df['ion n'], self.df['ion n'][
                 log_starts(self.df['ion n'])][goot])
-        return(sim_data(self.data[good_ions]))
+        return(self.mask(good_ions))
 
     def not_good(self):
-        gx = self.df['x'][log_stops(self.df['ion n'])] > 72
-        gy = self.df['r'][log_stops(self.df['ion n'])] < 50
+        stops = log_stops(self.df['ion n'])
+        gx = np.logical_and(self.df[self.base_ax][stops] > self.obs['X_MIN'],
+                    self.df[self.base_ax][stops] < self.obs['X_MAX'])
+        gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
+                    self.df['r'][stops] > self.obs['R_MIN']) 
         goot = np.logical_and(gx, gy)
+
         good_ions = np.in1d(
             self.df['ion n'], self.df['ion n'][
                 log_starts(self.df['ion n'])][goot])
-        return(sim_data(self.data[~good_ions]))
+        return(self.mask(~good_ions))
 
     def show(self,hist_bins = 50,variables = ['tof','ke','x','r','theta','phi']):
         fig, axs = plt.subplots(3,2)

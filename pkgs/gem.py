@@ -5,11 +5,10 @@ from skimage import feature
 from skimage import measure
 from matplotlib import pyplot as plt
 from matplotlib import widgets
-from shapely.geometry import Polygon as spoly
-from shapely.geometry import MultiPolygon as mpoly
+# from shapely.geometry import Polygon as spoly
+# from shapely.geometry import MultiPolygon as mpoly
 from matplotlib.patches import Polygon,Ellipse
-from matplotlib.collections import PatchCollection
-from matplotlib import path
+from matplotlib.collections import PatchCollectionfrom matplotlib import path
 from mpl_toolkits import mplot3d
 import time
 from . import fig_measure as meat
@@ -265,14 +264,7 @@ def gem_draw_poly(gem_file,measure = False,
     ax.set_aspect('equal')
     plt.show()
 
-    if measure == True:
-        # import fig_measure as meat
-        measur = meat.measure(fig,ax)
-        measur.connect()
-    elif mark==True:
-        mrk = meat.mark(fig,ax)
-        mrk.connect()
-    elif annotate ==True:
+    if annotate ==True:
         numbers = list(elec_center)
         locations = list(elec_center.values())
         bbox_props =dict(boxstyle="round", fc="w", ec="0.5", alpha=0.6)
@@ -280,8 +272,8 @@ def gem_draw_poly(gem_file,measure = False,
             nams = numbers
         else:
             nams = [elec_names[num] for num in numbers]
-        lab = meat.label(fig,ax,nams,locations)
-        lab.connect()
+        ax.label = meat.label(fig,ax,nams,locations)
+        ax.label.connect()
     if path_out == False:
         return(fig,ax)
     else:
@@ -319,6 +311,45 @@ def get_canvas(gem_file):
             break
     return(canvas_size,pxls_mm)
 
+def get_pa_info(gem_file):
+    with open(gem_file) as lines:
+        file_lines = lines.readlines()
+
+    reloc = []
+    new_lines = ['']*len(file_lines)
+
+    i = 0
+    # clean the file of comments,spaces and black lines
+    for line in file_lines:
+        line = line[:line.find(';')].strip('\n').strip(' ')
+        if line != '':
+            if line.find(',') !=-1 and line[-1] ==',':
+                new_lines[i]+=line.strip(' ')
+            else:
+                new_lines[i]+=line.strip(' ')
+                i+=1
+    for line,n in zip(new_lines,range(len(new_lines))):
+        if line == '':
+            del(new_lines[i])
+
+
+    for line in new_lines:
+<<<<<<< HEAD
+=======
+        if line.lower()[:line.find(';')].find('pa_define') != -1:
+            info = within(line,'(',')').split(',')
+            canvas_info = {'Lx':int(info[0]),
+                           'Ly':int(info[1]),
+                           'Lz':int(info[2]),
+                           'symmetry':info[3].strip().lower(),
+                           'mirroring': info[4].strip()[0].lower(),
+                           'base':{'x':'y','y':'x'}[info[4].strip()[0].lower()]
+                           }
+        if line.lower()[:line.find(';')].find('locate') != -1:
+            canvas_info['pxls_mm'] = np.fromstring(within(line,'(',')'),sep =',')[-1]
+            break
+    return(canvas_info)
+
 def get_verts(gem_file):
     with open(gem_file) as lines:
         file_lines = lines.readlines()
@@ -346,6 +377,7 @@ def get_verts(gem_file):
     excludes = {}
     num = 0
     for line in new_lines:
+>>>>>>> 6a99395ea5c8b8ccd8c5ed8d08565068ae335643
         if line != '':
             if line.lower()[:line.find(';')].find('electrode') != -1:
                 num = int(line[line.find('(')+1:line.find(')')])
@@ -372,27 +404,27 @@ def get_verts(gem_file):
                 m += 1
             elec_count += 1
         n += 1
-    # using the calculated verts, clip the excludes
-    elec_clip = {}
-    for nam in electrodes:
-        elec_clip[nam] = []
-        elec_poly = []
-        for part in electrodes[nam]:
-            poly_part = spoly([[p[0],p[1]] for p in part])
-            part_max = np.max(part,axis = 0)
-            part_min = np.min(part,axis = 0)
-            for clip in excludes[nam]:
-                clip_poly = spoly([[p[0],p[1]] for p in clip])
-                if poly_part.intersects(clip_poly) ==True:
-                    x,y = clip_poly.exterior.coords.xy
-                    # plt.plot(x,y)
-                    poly_part=(poly_part.difference(clip_poly))
-            elec_poly.append(poly_part)
+    # using the calculated verts, clip the excludes not really working
+    # elec_clip = {}
+    # for nam in electrodes:
+    #     elec_clip[nam] = []
+    #     elec_poly = []
+    #     for part in electrodes[nam]:
+    #         poly_part = spoly([[p[0],p[1]] for p in part])
+    #         part_max = np.max(part,axis = 0)
+    #         part_min = np.min(part,axis = 0)
+    #         for clip in excludes[nam]:
+    #             clip_poly = spoly([[p[0],p[1]] for p in clip])
+    #             if poly_part.intersects(clip_poly) ==True:
+    #                 x,y = clip_poly.exterior.coords.xy
+    #                 # plt.plot(x,y)
+    #                 poly_part=(poly_part.difference(clip_poly))
+    #         elec_poly.append(poly_part)
 
-        for ppart in list(mpoly(elec_poly)):
-            x,y = ppart.exterior.coords.xy
-            elec_clip[nam].append(np.stack([x,y]).T)
-    return(elec_clip,excludes)
+    #     for ppart in list(mpoly(elec_poly)):
+    #         x,y = ppart.exterior.coords.xy
+    #         elec_clip[nam].append(np.stack([x,y]).T)
+    return(electrodes,excludes)
 
 def gem_relocate(fil_in,fil_out):
     def find_all(a_str, sub):
@@ -650,7 +682,9 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
 
     fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
     
-    line = meat.line_draw(fig,ax).connect()
+    lin_drw = meat.line_draw(fig,ax).connect()
+    input('Hit a key when done drawing')
+    line =lin_drw.lines[-1]
     line.set_solid_capstyle('round')
     line_verts = np.stack(line.get_data()).T
     poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
@@ -713,7 +747,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
         w+=1
         fig.canvas.draw()
         fig.canvas.flush_events()
-        check = input()
+        check = input('press any key to grow, q to quit')
 
         
     print(w)
