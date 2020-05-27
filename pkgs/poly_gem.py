@@ -177,11 +177,11 @@ def poly_draw(final_polys,canvas = [],
     return(fig,ax)
 
 
-def draw(gemfil,canvas = [],mirror_ax = None,fig = [],ax = [],origin = np.zeros(2)):
+def draw(gemfil,canvas = [],mirror_ax = None,fig = [],ax = [],origin = np.zeros(2),cmap = cm.viridis):
     electrodes = get_verts(gemfil)
     poly_polys =verts_to_polys(electrodes) 
     final_polys = poly_meld(poly_polys)
     fig,ax = poly_draw(final_polys,canvas = canvas,fig = fig,
                         ax = ax, mirror_ax = mirror_ax,
-                        origin = origin)
+                        origin = origin,cmap = cmap)
     return(fig,ax)
