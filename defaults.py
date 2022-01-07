@@ -26,8 +26,10 @@ EL_DIST_VALS = {'mean':150,
 
 # Starting Position
 POS_DIST_TYPE = 'line'
-POS_DIST_VALS = {'first':np.array([99.4,133,0]),
-				'last':np.array([158.9,116.8,0])}
+# POS_DIST_VALS = {'first':np.array([99.4,133,0]),
+# 				'last':np.array([158.9,116.8,0])}
+POS_DIST_VALS = {'first':np.array([100.5,134.6,0]),
+                'last':np.array([160,118.4,0])}
 
 #==========================================================
 # Define the measurement region as a box, using the 
@@ -39,6 +41,10 @@ X_MIN = 72
 
 R_MAX = 45.1
 R_MIN = 35.4
+
+# Use the impact angle to help more accurately determine
+#	observability at ToF
+TOF_MEASURE = True
 
 #==========================================================
 # Weight the particle counts by their distance from the 

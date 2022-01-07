@@ -61,6 +61,7 @@ def get_verts(gemfil):
     electrodes = {}
     for elec in electrode_list:
         if '(' in elec:
+            elec = elec.rsplit('}',2)[0]
             op_split = elec.split('fill{')[1:]
             e_num = int(elec[elec.find('(')+1:elec.find(')')])
             if e_num not in electrodes:
@@ -70,22 +71,30 @@ def get_verts(gemfil):
                 fill = {}
                 fill['dtype'] = []
                 fill['polys'] = []
+                locate = np.array([0,0,0,1])
                 for b in bsp_1:
-                    if 'in' in b:
-                        dtype_split = b.split('{')
-                        poly_split = dtype_split[1].split(')')
-                        sep_poly = {}
-                        sep_poly['shape'] = []
-                        sep_poly['verts'] = []
-                        for poly in poly_split:
-                            if poly:
-                                vert_split=  poly.split('(')
-                                nam = vert_split[0]
-                                verts = np.fromstring(vert_split[1],sep = ',')
-                                sep_poly['shape'].append(nam)
-                                sep_poly['verts'].append(verts)
-                        fill['dtype'].append(dtype_split[0])
-                        fill['polys'].append(sep_poly)
+                    if b:
+                        if 'locate' in b:
+                            locate = np.fromstring(b[b.find('(')+1:b.find(')')],sep = ',')
+                            b = b.split('{',1)[1]
+                        if 'in' in b:
+                            dtype_split = b.split('{')
+                            poly_split = dtype_split[1].split(')')
+                            sep_poly = {}
+                            sep_poly['shape'] = []
+                            sep_poly['verts'] = []
+                            for poly in poly_split:
+                                if poly:
+                                    vert_split=  poly.split('(')
+                                    nam = vert_split[0]
+                                    verts = np.fromstring(vert_split[1],sep = ',')
+                                    verts = (verts.reshape(-1,2)+locate[:2]).flatten()
+                                    sep_poly['shape'].append(nam)
+                                    sep_poly['verts'].append(verts)
+                            fill['dtype'].append(dtype_split[0])
+                            fill['polys'].append(sep_poly)
+                    else:
+                        locate = np.array([0,0,0,1])
                 electrodes[e_num].append(fill)
 
     return(electrodes)
@@ -144,14 +153,102 @@ def poly_meld(poly_polys):
         final_polys[elec] = elec_polys
     return(final_polys)
 
+def poly_unify(poly_polys):
+    final_polys = {}
+    for elec,polys in poly_polys.items():
+        final_polys[elec] = []
+        for in_polys,notin_polys in zip(polys['in'],polys['notin']):
+            elec_polys = []
+            for in_poly in in_polys:
+                if in_poly:
+                    for notin_poly in notin_polys:
+                        if in_poly.intersects(notin_poly) == True:
+                            try:
+                                in_poly = in_poly.difference(notin_poly)
+                                in_poly = in_poly.simplify()
+                            except:
+                                pass
+                                # print('Warning: Poly Draw Failed on electrode %d'%elec)
+                    if in_poly.geom_type.lower()=='geometrycollection' or type(in_poly) == geo.MultiPolygon:
+                        for p in in_poly.geoms:
+                            if p.geom_type.lower() == 'polygon':
+                                elec_polys.append(p)
+                        # elec_polys.append([p for p in in_poly])
+                    else:
+                        elec_polys.append(in_poly)
+            final_polys[elec].append(geo.MultiPolygon(elec_polys))
+    return(final_polys)
+
 def poly_draw(final_polys,canvas = [],
-              fig = [],ax = [],mirror_ax = None,
-              origin = np.zeros(2),cmap = cm.rainbow):
+              fig = [],ax = [],show_mirror= False,mirror_ax = None,
+              origin = np.zeros(2),cmap = cm.rainbow,
+              show_verts = False,sub_cols = False):
     from shapely.affinity import scale,translate
     if not fig:
         fig,ax = plt.subplots()
     elecs = list(final_polys.keys())
+
+    e_tot = 0
     for num,elec in final_polys.items():
+        e_tot+=len(elec)
+    n = 0
+    for num,elec in final_polys.items():
+        for poly in elec:
+            if poly:
+                if canvas:
+                    poly = poly.difference(poly.difference(gem_poly().get_poly('box',np.array([0,0,canvas[0],canvas[1]]))))
+                if show_mirror ==True:
+                    if mirror_ax.lower()=='y':
+                        Q1 = scale(poly, yfact = -1, origin = (0,0))
+                    elif mirror_ax.lower()=='x':
+                        Q1 = scale(poly, xfact = -1, origin = (0,0))
+                    Q1 = translate(Q1,-origin[0],-origin[1])
+                    tpatch = PolygonPatch(Q1)
+                    tpatch.set_color(cmap(num/max(elecs)))
+                    tpatch.set_linewidth(0)
+                    ax.add_patch(tpatch)
+                poly = translate(poly,-origin[0],-origin[1])
+                patch = PolygonPatch(poly)
+                xy = patch.get_verts()
+                if sub_cols == True:
+                    patch.set_color(cmap(n/e_tot))
+                    n+=1
+                else:
+                    patch.set_color(cmap(num/max(elecs)))
+                patch.set_linewidth(0)
+                ax.add_patch(patch)
+                # if show_verts == True:
+                #     ax.plot(xy[:,0],xy[:,1],'.')
+
+    ax.autoscale(enable = True)
+    ax.set_aspect('equal')
+    return(fig,ax)
+
+
+def draw(gemfil,canvas = [],mirror_ax = None,fig = [],ax = [],
+         origin = np.zeros(2),cmap = cm.viridis,show_verts = False,show_mirror = False):
+    electrodes = get_verts(gemfil)
+    poly_polys =verts_to_polys(electrodes) 
+    final_polys = poly_meld(poly_polys)
+    fig,ax = poly_draw(final_polys,canvas = canvas,fig = fig,
+                        ax = ax, mirror_ax = mirror_ax,
+                        origin = origin,cmap = cmap,show_verts = show_verts,show_mirror = show_mirror)
+    return(fig,ax)
+
+def clean_verts(gemfil,canvas = [],mirror_ax = None,fig = [],ax = [],origin = np.zeros(2)):
+    electrodes = get_verts(gemfil)
+    poly_polys =verts_to_polys(electrodes) 
+    final_polys = poly_meld(poly_polys)
+
+    from shapely.affinity import scale,translate
+    if not fig:
+        plt.ioff()
+        fig,ax = plt.subplots()
+        plt.ion()
+    elecs = list(final_polys.keys())
+    verts = {}
+    for num,elec in final_polys.items():
+        verts[num] = []
         for poly in elec:
             if poly:
                 if canvas:
@@ -167,21 +264,13 @@ def poly_draw(final_polys,canvas = [],
                     tpatch.set_linewidth(0)
                     ax.add_patch(tpatch)
                 poly = translate(poly,-origin[0],-origin[1])
-                patch = PolygonPatch(poly)
-                patch.set_color(cmap(num/max(elecs)))
-                patch.set_linewidth(0)
-                ax.add_patch(patch)
-
-    ax.autoscale(enable = True)
-    ax.set_aspect('equal')
-    return(fig,ax)
+                verts[num].append(PolygonPatch(poly).get_verts())
+        # verts[num] = np.concatenate(verts[num])
+    return(verts)
 
 
-def draw(gemfil,canvas = [],mirror_ax = None,fig = [],ax = [],origin = np.zeros(2),cmap = cm.viridis):
+def get_polys(gemfil):
     electrodes = get_verts(gemfil)
     poly_polys =verts_to_polys(electrodes) 
     final_polys = poly_meld(poly_polys)
-    fig,ax = poly_draw(final_polys,canvas = canvas,fig = fig,
-                        ax = ax, mirror_ax = mirror_ax,
-                        origin = origin,cmap = cmap)
-    return(fig,ax)
+    return(final_polys)

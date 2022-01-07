@@ -8,7 +8,8 @@ from matplotlib import widgets
 # from shapely.geometry import Polygon as spoly
 # from shapely.geometry import MultiPolygon as mpoly
 from matplotlib.patches import Polygon,Ellipse
-from matplotlib.collections import PatchCollectionfrom matplotlib import path
+from matplotlib.collections import PatchCollection
+from matplotlib import path
 from mpl_toolkits import mplot3d
 import time
 from . import fig_measure as meat
@@ -334,8 +335,6 @@ def get_pa_info(gem_file):
 
 
     for line in new_lines:
-<<<<<<< HEAD
-=======
         if line.lower()[:line.find(';')].find('pa_define') != -1:
             info = within(line,'(',')').split(',')
             canvas_info = {'Lx':int(info[0]),
@@ -343,7 +342,7 @@ def get_pa_info(gem_file):
                            'Lz':int(info[2]),
                            'symmetry':info[3].strip().lower(),
                            'mirroring': info[4].strip()[0].lower(),
-                           'base':{'x':'y','y':'x'}[info[4].strip()[0].lower()]
+                           'base':('y' if info[4].strip()[0].lower() == 'x' else 'x')
                            }
         if line.lower()[:line.find(';')].find('locate') != -1:
             canvas_info['pxls_mm'] = np.fromstring(within(line,'(',')'),sep =',')[-1]
@@ -377,7 +376,6 @@ def get_verts(gem_file):
     excludes = {}
     num = 0
     for line in new_lines:
->>>>>>> 6a99395ea5c8b8ccd8c5ed8d08565068ae335643
         if line != '':
             if line.lower()[:line.find(';')].find('electrode') != -1:
                 num = int(line[line.find('(')+1:line.find(')')])
@@ -535,12 +533,12 @@ def gem_relocate(fil_in,fil_out):
             # scale_fact = np.fromstring(within(line,'(',')'),sep =',')[-1]
             # if scale_fact == 0 or scale_fact =='':
             #     scale_fact = 1
-            # scale_fact = within(line,'(',')').split(',')[-1]
-            # if scale_fact == '0' or scale_fact =='':
-            #     scale_fact = 1
-            # else:
-            #     scale_fact = float(scale_fact)
-            scale_fact = 1
+            scale_fact = within(line,'(',')').split(',')[-1]
+            if scale_fact == '0' or scale_fact =='':
+                scale_fact = 1
+            else:
+                scale_fact = float(scale_fact)
+            # scale_fact = 1
 
             op_brac = line[line.lower().find('locate('):].count('{')
             close_brac = 0
@@ -560,15 +558,17 @@ def gem_relocate(fil_in,fil_out):
             end_bracs = find_all(new_lines[n+m],'}')[brac_num - 1]
             
             new_lines[n] = line.replace(line[line.find('locate'):line.find(')')+1],' ')
-            new_lines[n+z] = new_lines[n+z][:l] + '' + new_lines[n+z][l+1:]        
-            new_lines[n+m] = new_lines[n+m][:end_bracs] + '' + new_lines[n+m][end_bracs+1:] 
+            new_lines[n+z] = new_lines[n+z][:l] + new_lines[n+z][l+1:]   
+            new_lines[n+m] = new_lines[n+m][:end_bracs] + new_lines[n+m][end_bracs+1:]  + '\n'
          
         n += 1
 
     #%%
     with open(fil_out, 'w') as f:
         for item in new_lines:
-            f.write(item.replace('within{','\nwithin{').replace('notin{','\nnotin{'))
+            line = item[:item.find(';')]
+            cmt = item[item.find(';'):]
+            f.write(line.replace('within{','\nwithin{').replace('notin{','\nnotin{')+cmt)
     return(new_lines)
 
 
@@ -680,7 +680,9 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
         img = gem_draw(gemfile,plot = False).T
     canvas_shape,pxls_mm = get_canvas(gemfile)
 
-    fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
+    # fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
+    from .poly_gem import draw
+    fig,ax = draw(gemfile)
     
     lin_drw = meat.line_draw(fig,ax).connect()
     input('Hit a key when done drawing')
@@ -741,9 +743,10 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
         poly_verts[~got_edge,0] += -dx[~got_edge]
         poly_verts[~got_edge,1] += dy[~got_edge]
 
-
+        over = polyline.get_path().contains_points(poly_verts)
+        poly_verts = poly_verts[np.logical_or(got_edge,~over)]
+        got_edge = got_edge[np.logical_or(got_edge,~over)]
         polyline.set_xy(poly_verts)
-
         w+=1
         fig.canvas.draw()
         fig.canvas.flush_events()
@@ -773,7 +776,7 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
     edge_verts = np.insert(edge_verts,dis,np.nan,axis = 0)
     edge_ang = np.insert(edge_ang,dis,np.nan)
     
-    ax.plot(edge_verts[:,0],edge_verts[:,1])
+    ax.plot(edge_verts[:,0],edge_verts[:,1],'.')
     return(edge_verts,edge_ang)
 
 def get_gem_edge_norm(gemfil,verts,pxls_mm,gem_img=[],show = True,grad_num = 5):
@@ -802,3 +805,100 @@ def get_gem_edge_norm(gemfil,verts,pxls_mm,gem_img=[],show = True,grad_num = 5):
         ax.quiver(verts[:,0],verts[:,1],dx_v,dy_v,scale_units = 'xy')
     return(dx_v,dy_v)
 
+
+
+def command_nest(gemfil):
+    fil = open(gemfil,'r')
+    lines = fil.readlines()
+    # clean lines and remove comments
+    clean_lines =[]
+    for line in lines:
+        l = line.strip()
+        if l and l[0]!=';':
+            clean_lines.append(l.split(';')[0].strip())
+
+    # identify start of electrode declaration
+    for i in range(len(clean_lines)):
+        if '{' in clean_lines[i].lower():
+            break
+
+    # concatenate lines into one mega line
+    tot_line = ''
+    for l in clean_lines[i:]:
+        tot_line +=l.replace(' ','')
+
+    # split lines by electrode declaration
+    electrode_list = tot_line.lower().split('electrode')[1:]
+    # subdivide draw commands by electrode, fill, and drawtype
+    electrodes = {}
+    loc_0 = np.zeros(2)
+    for elec in electrode_list:
+        if '(' in elec:
+            op_split = elec.split('fill{')[1:]
+            op_head = elec.split('fill{')[0]
+            if 'locate(' in op_head:
+                op_head_split = op_head.split('locate(')
+                loc_1 = np.fromstring(op_head_split[1][op_head_split[1].find('locate(')+1:op_head_split[1].find(')')],sep = ',')[:2]
+                e_num = int(elec[op_head_split[0].find('(')+1:op_head_split[0].find(')')])
+            else:
+                loc_1 = np.zeros(2)+loc_0
+                e_num = int(elec[op_head.find('(')+1:op_head.find(')')])
+            # print(loc_0)
+            print(loc_1)
+
+            if e_num not in electrodes:
+                electrodes[e_num] = []
+            for op in op_split:
+                # print(op.count('{')-op.count('}'))
+                bsp_1 = op.split('}')[:-1]
+                fill = {}
+                fill['dtype'] = []
+                fill['polys'] = []
+                fill['locate'] = []
+                for b in bsp_1:
+                    if 'in' in b:
+                        dtype_split = b.split('{')
+                        poly_split = dtype_split[1].split(')')
+                        sep_poly = {}
+                        sep_poly['shape'] = []
+                        sep_poly['verts'] = []
+                        for poly in poly_split:
+                            if poly:
+                                vert_split=  poly.split('(')
+                                nam = vert_split[0]
+                                verts = np.fromstring(vert_split[1],sep = ',')
+                                sep_poly['shape'].append(nam)
+                                sep_poly['verts'].append(verts)
+                        fill['dtype'].append(dtype_split[0])
+                        fill['polys'].append(sep_poly)
+                electrodes[e_num].append(fill)
+
+    return(electrodes)
+
+
+
+
+def get_elec_nums_gem(gem_fil):
+    '''
+    Get the electrode numbers and names from a gemfile and store them in 
+    elec_nums and elec_dict. 
+    
+    Parameters
+    ----------
+    gem_fil: string
+        gemfile to take the names and values from. Default uses the GEM file stored
+        in self.gemfil
+    '''
+
+    lines = open(gem_fil).readlines()
+    elec_num = []
+    elec_dict = {}
+    for line in lines:
+        if line != '':
+            if line.lower()[:line.find(';')].find('electrode') != -1:
+                num = int(line[line.find('(') + 1:line.find(')')])
+                if num not in elec_num:
+                    elec_num.append(num)
+                    elec_dict[num] = line[line.find(
+                        ';'):].strip(';').strip()
+    return(elec_num,elec_dict)

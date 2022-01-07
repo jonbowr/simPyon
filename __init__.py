@@ -1,2 +1,2 @@
-from .pkgs import data,particles,gem
-from .pkgs.simion import simion
+from .simPyon import data,particles,gem
+from .simPyon.simion import simion

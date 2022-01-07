@@ -9,10 +9,12 @@ from scipy import stats
 import math
 from matplotlib import pyplot as plt
 from . import gem
+from .geo import geo
 from .particles import auto_parts
 from .data import sim_data
 from ..defaults import *
 from shutil import copy
+from matplotlib import cm
 
 class simion:
     '''
@@ -58,30 +60,30 @@ class simion:
     parts : simPyon.particles.sim_parts object
         distribution of source particles 
     '''
-    def __init__(self,volt_dict = {},home = './',
+    def __init__(self,volt_dict = {},
+                 home = './',
                  gemfil = '',recfil = '',
                  traj_recfil = '',
-                 bench = ''):
+                 bench = '',
+                 pa = ''):
         self.commands = []
         self.home = home
         self.sim = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
         self.elec_num = []
         self.pa = []
-        self.gemfil = []
+        self.usr_prgm = 'simion.workbench_program() \n function segment.other_actions() \n end'
         self.elect_dict = {}
         self.volt_dict = volt_dict
+        self.recfil = recfil
         self.data = []
+        self.v_data = []
         self.parts = auto_parts()
         self.traj_refil = traj_recfil
         self.trajectory_quality = 3
-        # copy rec file to home directory if none already exists
-        if recfil == '':
-            self.recfil = self.home+'simPyon_base.rec'
-            copy("%s/rec/simPyon_base.rec"%\
-                            os.path.dirname(os.path.dirname(__file__)+'..'),
-                            self.recfil)
+        self.scale_exclude = []
 
         # Grab workbench, potential arrays and gemfiles from current directory
+        self.bench = ''
         if bench == '':
             for file in os.listdir(home):
                 if file.endswith(".iob"):
@@ -89,26 +91,57 @@ class simion:
         else:
             self.bench = os.path.join(home,bench)
 
-        for root,dirs,files in os.walk(home):
-            for file in files:
-                if file.endswith(".pa0"):
-                    self.pa0 = os.path.join(root,file)
-                elif file.endswith(".pa#"):
-                    self.pa = os.path.join(root,file).strip('#')
+        if not pa:
+            self.pa = []
+            for root,dirs,files in os.walk(home):
+                for file in files:
+                    if file.endswith(".pa0"):
+                        self.pa.append(os.path.join(root,file).strip('0'))
+        elif type(pa)== str:
+            self.pa = [os.path.join(home,pa)]
+        elif type(pa) == list:
+            self.pa = [os.path.join(home,p) for p in pa]
+        # if gemfil =='':
+        #     # self.gemfil = []
+        #     for file in os.listdir(home):
+        #         if file.lower().endswith(".gem"):
+        #             self.gemfil = os.path.join(home,file)
+        #             # self.gemfil.append(os.path.join(home,file))
+        
         if gemfil =='':
-            for file in os.listdir(home):
-                if file.lower().endswith(".gem"):
-                    self.gemfil = os.path.join(home,file)
-        else:
-            self.gemfil = home + gemfil
+            self.gemfil = []
+            for root,dirs,files in os.walk(home):
+                for file in files:
+                    if file.lower().endswith(".gem"):
+                        self.gemfil.append(os.path.join(root,file))
+        elif  type(gemfil) == list: 
+            self.gemfil = []
+            for gm in gemfil:
+                self.gemfil.append(os.path.join(home,gm))
+        elif type(gemfil) == str:
+            self.gemfil = [os.path.join(home,gemfil)]
 
-        self.name = gemfil.upper().strip('.GEM')
+
+        self.name = self.gemfil[0].upper().strip('.GEM')
         #scrape the gemfile for numbers
-        self.get_elec_nums_gem()
-        self.pa_info = gem.get_pa_info(self.gemfil)
+        self.pa_info = []
+        self.gem_nums = []
+        for gm in self.gemfil:
+            self.get_elec_nums_gem(gm)
+            self.gem_nums.append(gem.get_elec_nums_gem(gm)[0])
+            self.pa_info.append(gem.get_pa_info(gm))
+        self.geo = geo(self.gemfil)
 
+    def __repr__(self):
+        return('%s \n'%str(type(self))+
+                'Workbench:%s \n'%self.bench +
+                'Gemfile: %s \n'%self.gemfil+
+                'Pa: %s \n'%self.pa)
+        # print(type(self))
+        # print(self.gemfil)
+        # print()
 
-    def gem2pa(self,pa):
+    def gem2pa(self,gemfil = [], pa = None,pa_tag = '#'):
         '''
         Converts .GEM gemfile defined in self.gemfil to potential array (.pa#) with
         file name pa. Assigns pa to self.pa
@@ -118,17 +151,59 @@ class simion:
         pa: string
             name of newly generated .pa# potential array file
         '''
-        self.commands = r"gem2pa %s %s#" % (self.gemfil, pa)
-        self.pa = pa
-        self.run()
+        if not gemfil:
+            gemfil = self.gemfil
+        elif type(gemfil) == str:
+            gemfil = [gemfil]
 
-    def refine(self):
+        if not pa:
+            pa = self.pa
+
+        if pa == 'split':
+            pa = []
+            for i in range(len(gemfil)):
+                if i >0:
+                    pa.append(self.pa[0].replace('.pa','_%d.pa'%i))
+                else:
+                    pa.append(self.pa[0])
+        elif type(pa) != list:
+            pa = [pa]
+
+        self.pa = pa
+        for gm,pm in zip(gemfil,pa):
+            self.commands = r"gem2pa %s %s%s" % (gm, pm,pa_tag)
+            self.pa = pa
+            self.run()
+
+    def refine(self,pa = []):
         '''
         Refines potential array self.pa from .pa# to simions potential array structure
 
         '''
-        self.commands = r"refine %s#" % self.pa
-        self.run()
+        for pa in (pa if pa else self.pa):
+            self.commands = r"refine %s#" %pa
+            self.run()
+
+    def fast_refine(self,pa = []):
+        m_gems = []
+        for gm in self.gemfil:
+            temp_gem = gm.replace('.'+gm.split('.')[-1],'_temp.'+gm.split('.')[-1])
+            print(temp_gem)
+            with open(temp_gem,'w') as w:
+                for l in open(gm,'r').readlines():
+                    lc = l.split(';')[0]
+                    if 'electrode' in lc:
+                        for elec in self.elec_num:
+                            if '(%d)'%elec in lc.replace(' ',''):
+                                w.write(l.replace('(%d)'%elec,'(%.2f)'%self.volt_dict[self.elect_dict[elec]]))
+                    else:
+                        w.write(l)
+            m_gems.append(temp_gem)
+        self.gem2pa(m_gems,pa_tag = '')
+        for g in m_gems: os.remove(g)
+        for pa in (pa if pa else self.pa):
+            self.commands = r"refine %s" %pa
+            self.run()
 
     def __volt_adjust__(self,voltages, quiet = False):
         '''
@@ -145,12 +220,15 @@ class simion:
         ** Needs to be integrated with self.fast_adjust 
         *** user should use self.fast_adjust to perform fast adjust *** 
         '''
-        fast_adj_str = ''
-        for volt, num in zip(voltages, self.elec_num):
-            if num != 0:
-                fast_adj_str += '%d=%f,' % (num, volt)
-        self.commands = "fastadj %s %s" % (self.pa0, fast_adj_str[:-1])
-        self.run(quiet = quiet)
+        for pa,pa_nums in zip(self.pa,self.gem_nums):
+            fast_adj_str = ''
+            for num in pa_nums:
+                if num != 0:
+                    fast_adj_str += '%d=%f,' % (num, voltages[num])
+
+
+            self.commands = "fastadj %s %s" % (pa+'0', fast_adj_str[:-1])
+            self.run(quiet = False)
 
     def fast_adjust(self,volt_dict = [],scale_fact = 1,
                     quiet = False,keep = False):
@@ -184,12 +262,20 @@ class simion:
         (scale_fact if val < 16 else 1) for val in self.elec_num]
 
         if quiet == False:
-            for val in self.elec_num:
-                print(self.elect_dict[val])
-            print(volts)
+            print(' ===============================================')
+            print('| Fast Adjusting with Voltage Settings:')
+            print( '===============================================')
+            # print(self.volt_dict)
+            for elec_n,volt in zip(self.elec_num,volts):
+                print('| %s: %.2f '%(self.elect_dict[elec_n],volt))
+            # for val in self.elec_num:
+            #     print(self.elect_dict[val])
+            # print(volts)
+        num_volts = {}
         for num,volt in zip(self.elec_num,volts):
             dict_out[self.elect_dict[num]] = volt
-        self.__volt_adjust__(volts,quiet = quiet)
+            num_volts[num] = volt
+        self.__volt_adjust__(num_volts,quiet = quiet)
         if keep:
             self.volt_dict = dict_out
         return(self)  
@@ -215,15 +301,34 @@ class simion:
             instances is printed to cmd. 
         '''
 
+        # copy rec file to home directory if none already exists
+        if self.recfil == '':
+            self.recfil = os.path.join(self.home,'simPyon_base.rec')
+            copy("%s/rec/simPyon_base.rec"%\
+                            os.path.dirname(os.path.dirname(__file__)+'..'),
+                            self.recfil)
+
+
+        # Write the workbench program in 'usr_prgm'
+        if self.bench:
+            with open(self.bench.replace('iob','lua'),'w') as fil:
+                fil.write(self.usr_prgm)
+
+
         start_time = time.time()
 
 
+        if quiet == False:
+            print(' ===============================================')
+            print('| Begining Next Fly\'em:')
+            print('| %d Particles on %d Cores'%(n_parts,cores))
+            print(' ===============================================')
         # Fly the particles in parallel and scrape the resulting data from the shell
         outs = core_fly(self,n_parts,cores,quiet,
                         trajectory_quality =self.trajectory_quality)
-        data = str_data_scrape(outs,n_parts,cores,surpress_output)
-        self.data = sim_data(data,symmetry = self.pa_info['symmetry'],
-                                    mirroring = self.pa_info['mirroring'])
+        data = str_data_scrape(outs,n_parts,cores,quiet)
+        self.data = sim_data(data,symmetry = self.pa_info[0]['symmetry'],
+                                    mirroring = self.pa_info[0]['mirroring'])
 
         if quiet == False:
             print(time.time() - start_time)
@@ -232,7 +337,9 @@ class simion:
 
 
     def fly_trajectory(self,n_parts = 100,cores = multiprocessing.cpu_count(),
-                      surpress_output = False, dat_step = 30,show= True,geo_3d = False):
+                      quiet = False, dat_step = 30,show= True,geo_3d = False,
+                      fig = [],ax = [],cmap = 'eng',eng_cmap = cm.plasma,plt_kwargs = {},
+                      show_cbar = True,label = '',xlim = [-np.inf,np.inf]):
         '''
         Fly n_parts particles, and plot their trajectories. Uses the particle probability 
         distributions defined in self.parts, but tracks the particle movement. 
@@ -262,6 +369,11 @@ class simion:
                             self.home)
             # os.remove(self.home+'simPyon_traj.rec')
 
+        # Write the workbench program in 'usr_prgm'
+        if self.bench:
+            with open(self.bench.replace('iob','lua'),'w') as fil:
+                fil.write(self.usr_prgm)
+
         start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
         outs = core_fly(self,n_parts,cores,quiet,
@@ -280,31 +392,54 @@ class simion:
 
         # calculate the r position vec
         for dat in self.traj_data:
-            dat['r'] = np.sqrt(dat['z']**2+dat[self.pa_info['mirroring']]**2)
+            dat['r'] = np.sqrt(dat['z']**2+dat[self.pa_info[0]['mirroring']]**2)
 
         # Plot the trajectories
         if show == True:
+            # print(np.max(self.parts.ke.dist_out))
             if geo_3d == False:
-                fig,ax = self.show()
+                if cmap == 'eng':
+                    from matplotlib import cm
+                    from mpl_toolkits.axes_grid1 import make_axes_locatable
+                if not ax:
+                    fig,ax = self.show()
+                else:
+                    self.show(fig = fig,ax = ax)
                 for traj in self.traj_data:
-                    ax.plot(traj[self.pa_info['base']],traj['r'])
+                    if cmap == 'eng':
+                        plt_kwargs['color'] = eng_cmap(traj['ke'][0]/np.max(self.parts.ke.dist_out))
+                    ax.plot(traj[self.pa_info[0]['base']],traj['r'],**plt_kwargs)
+                ax.plot(traj[self.pa_info[0]['base']],traj['r'],label = label)
+                if cmap == 'eng' and show_cbar == True:
+                    divider = make_axes_locatable(ax)
+                    cax = divider.append_axes("right", size="5%", pad=0.05)
+                    # if show_cbar == True:
+                    cbar = plt.colorbar(plt.cm.ScalarMappable(cmap=eng_cmap, 
+                                                    norm=plt.Normalize(vmin=np.nanmin(self.parts.ke.dist_out), 
+                                                                       vmax=np.nanmax(self.parts.ke.dist_out))),
+                                            ax = ax,label = 'Ke [eV]',cax = cax)
             if geo_3d == True:
                 from mpl_toolkits.mplot3d import Axes3D,art3d
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection='3d')
-                elec_verts,exclude_verts = gem.get_verts(self.gemfil)
-                for el in elec_verts.values():
-                    for vt in el:
-                        ax.plot(vt[:,0],np.zeros(len(vt)),vt[:,1],
-                                color = 'grey')
-                        ax.plot(vt[:,0],np.zeros(len(vt)),-vt[:,1],
-                                color = 'grey')
-                        ax.plot(vt[:,0],-vt[:,1],np.zeros(len(vt)),
-                                color = 'grey')
+                # elec_verts = self.geo.get_xy()
+                for el in self.geo.get_xy():
+                    # for vt in el:
+                    vt = el[np.logical_and(el[:,0]>xlim[0],el[:,0]<xlim[1])]
+                    ax.plot(vt[:,0],np.zeros(len(vt)),vt[:,1],
+                            color = 'grey')
+                    # ax.plot(vt[:,0],np.zeros(len(vt)),-vt[:,1],
+                    #         color = 'grey')
+                    # ax.plot(vt[:,0],-vt[:,1],np.zeros(len(vt)),
+                    #         color = 'grey')
                         
                 for traj in self.traj_data:
                     ax.plot(traj['x'],-traj['z'],traj['y'])
                 ax.view_init(30, -70)
+                ax.set_xlim(0,200)
+                ax.set_xlim(0,200)
+                ax.set_ylim(-100,100)
+                
 
                 # ax.set_aspect('equal')
                 return(fig,ax)
@@ -339,6 +474,9 @@ class simion:
         Executes all of the initialized commands in self.commands
         '''
         if quiet == False:
+            print(' ===============================================')
+            print('| Executing Simion Command:')
+            print(' ===============================================')
             print(self.sim)
             print(self.commands)
         if quiet == True:
@@ -350,8 +488,9 @@ class simion:
         check.kill()
         return check
     
-    def show(self,measure = False,annotate = False, origin = [0,0],
-             collision_locs = False,fig = [],ax = []):
+    def show(self,measure = False,label = False, origin = [0,0],
+             collision_locs = False,fig = [],ax = [],cmap = cm.viridis,
+             show_verts = False,show_mirror  = False):
         '''
         Plots the geometry stored geometry file by scraping the gemfile for 
         polygon shape and renders them in pyplot using a collection of patches. 
@@ -372,29 +511,42 @@ class simion:
 
         '''
         from .poly_gem import draw
-        fig,ax1 = draw(self.gemfil,canvas = [self.pa_info['Lx'],
-                                    self.pa_info['Ly']],
-                                    fig = fig, ax = ax,
-                                    mirror_ax = self.pa_info['mirroring'],
-                                    origin = origin)
+        if not ax:
+            fig,ax = plt.subplots()
+        for gm,pa_inf in zip(self.gemfil,self.pa_info):
+            fig,ax1 = draw(gm,canvas = [pa_inf['Lx'],
+                                        pa_inf['Ly']],
+                                        fig = fig, ax = ax,
+                                        mirror_ax = pa_inf['mirroring'],
+                                        origin = origin,cmap = cmap,show_verts = show_verts, show_mirror = show_mirror)
+
+        if show_verts == True:
+            ax1.vpts = ax1.plot(np.concatenate(self.geo.get_x())-origin[0],
+                     np.concatenate(self.geo.get_y())-origin[1],'.')[0]
+
         if measure == True:
             from . import fig_measure as meat
-            fig,ax1 = meat.measure_buttons(fig,ax1)
+            fig,ax1 = meat.measure_buttons(fig,ax1,
+                        verts = np.concatenate(self.geo.get_xy(),axis = 0) - origin if show_verts else [])
 
         ax1.set_ylabel('$r=\sqrt{z^2 + y^2}$ [mm]')
         ax1.set_xlabel('x [mm]')
+
+        # if label ==True:
+
+
         if self.data != [] and collision_locs ==True:
 
             
             from scipy.interpolate import interpn
 
-            def density_scatter( x , y, ax = None, sort = True, bins = 20, **kwargs )   :
+            def density_scatter( x , y, ax = None, sort = True, bins = 20,weights = None, **kwargs )   :
                 """
                 Scatter plot colored by 2d histogram
                 """
                 if ax is None :
                     fig , ax = plt.subplots()
-                data , x_e, y_e = np.histogram2d( x, y, bins = bins)
+                data , x_e, y_e = np.histogram2d( x, y, bins = bins,weights = weights)
                 z = interpn( ( 0.5*(x_e[1:] + x_e[:-1]) , 0.5*(y_e[1:]+y_e[:-1]) ) , data , 
                             np.vstack([x,y]).T , method = "splinef2d", bounds_error = False )
 
@@ -410,13 +562,16 @@ class simion:
             ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.',color = 'r')
             ax1.plot(self.data.good().stop()['x'],self.data.good().stop()['r'],'.',color = 'blue')
 
-            fig,ax2 = plt.subplots(1)
+            fig2,ax2 = plt.subplots(1)
             h,xbins,ybins = np.histogram2d(self.data.good().stop()()['z'],
-                self.data.good().stop()()['y'], bins =int(30/10000*len(self.data)/2),
+                self.data.good().stop()()['y'], bins =int(30/10000*len(self.data['x'])/2),
                 weights =self.data.good().stop()()['counts'])
 
-            ax2.scatter(self.data.good().stop()()['z'],
-            self.data.good().stop()()['y'], color = 'blue')
+            # density_scatter(self.data.good().stop()['z'],self.data.good().stop()['y'],ax2,bins = 100)
+
+            density_scatter(self.data.good().stop()['z'],self.data.good().stop()['y'],ax2,bins = 100,weights = self.data.good().stop()['ke'])
+            # ax2.scatter(self.data.good().stop()()['z'],
+            # self.data.good().stop()()['y'], color = 'blue')
             ax2.set_xlabel('z [mm]')
             ax2.set_ylabel('y [mm]')
             cs = plt.contour((xbins[1:]+xbins[:-1])/2,
@@ -476,11 +631,18 @@ class simion:
             prompted after volages are input. 
         '''
         volts = {}
-        for elect in self.elect_dict.values():
-            volts[elect] = float(input(elect+': '))
+        for num,elec in self.elect_dict.items():
+            if elec in self.volt_dict:
+                voltin = input('Update %s Voltage [%fV] (enter to skip):'%(elec,self.volt_dict[elec]))
+                if voltin == '':
+                    volts[elec] = self.volt_dict[elec]
+                else:
+                    volts[elec] = float(voltin)    
+            else:
+                volts[elec] = float(input('Input %s Voltage [V]:'%elec))
+        self.volt_dict = volts
         if save == True:
             np.save(input('File Name to Save to: '),volts)
-        self.volt_dict = volts
         return(volts)
 
     def get_master_volts(self,volt_dict = []):
@@ -495,6 +657,7 @@ class simion:
             self.master_volts[elec_num] = volt_dict[self.elect_dict[elec_num]]
         for elec_name in volt_dict:
             self.master_volts[elec_name] = volt_dict[elec_name]
+            os.system('cls' if os.name == 'nt' else 'clear')
         return(self.master_volts)
 
     def scale_volts(self,volt_dict,scale_fact):
@@ -506,6 +669,168 @@ class simion:
         for num,nam in self.elect_dict.items():
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
         return(s_volts)
+
+    def calc_pe(self,mm_pt=10,x_rng = None,y_rng = None,param = 'v',
+                        cores = multiprocessing.cpu_count()):
+        from .particles import source
+
+        with open(self.bench.replace('iob','lua'),'w') as fil:
+            fil.write('simion.workbench_program()\n adjustable max_time = 0   -- microseconds\n'+
+                      'function segment.other_actions()\n if ion_time_of_flight >= max_time then\n'+
+                        'ion_splat = -1 \n end\n end')
+
+        if not x_rng:
+            verts = np.concatenate(self.geo.get_x())
+            x_rng = [min(verts),max(verts)]
+
+        if not y_rng:
+            verts = np.concatenate(self.geo.get_y())
+            y_rng = [min(verts),max(verts)]
+        
+        x = np.linspace(x_rng[0],x_rng[1],int((x_rng[1]-x_rng[0])/mm_pt))
+        y = np.linspace(y_rng[0],y_rng[1],int((y_rng[1]-y_rng[0])/mm_pt))
+        xx,yy = np.meshgrid(x,y)
+        xy = np.stack([xx.flatten(),yy.flatten()]).T
+
+        p_source = auto_parts()
+        p_source.n = len(xy)
+
+        p_source.pos = source('fixed_vector',len(xy))
+        p_source.pos['vector'] = xy
+
+        store_parts = self.parts
+
+        self.parts = p_source
+
+
+        copy("%s/rec/simPyon_pe.rec"%\
+                        os.path.dirname(os.path.dirname(__file__)+'..'),
+                        self.home+'simPyon_pe.rec')
+
+        dat = str_data_scrape(core_fly(self,len(xy),cores,quiet = False,
+                                        rec_fil = self.home+'simPyon_pe.rec',
+                                        trajectory_quality=0),len(xy),cores,quiet = False)
+        v_full = np.zeros(len(xy))
+        v_full[dat[:,0].astype(int)-1] = dat[:,5]
+
+        v_full = np.zeros((len(xy),2))*np.nan
+        v_full[dat[:,0].astype(int)-1] = dat[:,4:]
+
+        v_dat = {}
+        v_dat['x'] = x
+        v_dat['y'] = y
+        v_dat['xy'] = xy
+        v_dat['v'] = v_full[:,0]
+        v_dat['grad v'] = v_full[:,1]
+
+
+        self.v_data = v_dat
+        self.parts = store_parts
+        # return(v_dat)
+
+    def show_pe(self,param = 'v',cmap = cm.jet,vmax = None,
+                vmin = None,imtype = 'both',levels = 10,
+                colorbar_name = '',
+                gaussian_sigma = 1,log = True,thresh = 200):
+
+        def sym_logspace(start,stop,num,thresh=1):
+            rng = abs(stop-start)
+            # if abs(start)>abs(stop):
+
+            sfrac = int(np.log(abs(start))/np.log(rng)*num)
+            stfrac = int(np.log(abs(stop))/np.log(rng)*num)
+
+            # print(start/abs(start)*np.geomspace(thresh,abs(start),sfrac))
+            if start <0 and stop >0:
+                return(np.sort(np.concatenate([
+                                start/abs(start)*np.geomspace(thresh,abs(start),sfrac),
+                                np.insert(stop/abs(stop)*np.geomspace(thresh,abs(stop),stfrac),0,0)],
+                                )))
+
+        from matplotlib import cm,ticker
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        from scipy.ndimage import gaussian_filter as gf
+        fig,ax = plt.subplots()
+        im = []
+        xy = self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()
+        mino = (np.nanmin(xy) if not vmin else vmin)
+        maxo = (np.nanmax(xy) if not vmax else vmax)
+        if imtype =='vmap' or imtype == 'both':
+            dx = self.v_data['x'][1]-self.v_data['x'][0]
+            dy = self.v_data['y'][1]-self.v_data['y'][0]
+            x = np.zeros(len(self.v_data['x'])+1)
+            y = np.zeros(len(self.v_data['y'])+1)
+            x[:-1] = self.v_data['x'] - dx/2
+            x[-1] = self.v_data['x'][-1]+dx/2
+            y[:-1] = self.v_data['y'] - dy/2
+            y[-1] = self.v_data['y'][-1]+dy/2
+            xy = self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()
+            def gauss_filt_nan(U,sigma,truncate = 4):
+                from scipy.ndimage import gaussian_filter
+                V=U.copy()
+                V[np.isnan(U)]=0
+                VV=gaussian_filter(V,sigma=sigma,truncate=truncate)
+
+                W=0*U.copy()+1
+                W[np.isnan(U)]=0
+                WW=gaussian_filter(W,sigma=sigma,truncate=truncate)
+
+                return(VV/WW)
+            
+            if gaussian_sigma >0:
+                xy = gauss_filt_nan(xy,gaussian_sigma)
+            xy[np.isnan(xy)] = gf(np.nan_to_num(xy),sigma = 2)[np.isnan(xy)]
+
+            # if log == True:/
+            import matplotlib.colors as colors
+            
+            # xy = gf(np.nan_to_num(xy),gaussian_sigma)/gf(xy,gaussian_sigma)
+            im = plt.pcolormesh(x,y,xy, cmap = cmap,
+                                vmax = vmax,vmin = vmin,
+                                antialiased = True,shading = 'auto',
+                                norm=(colors.SymLogNorm(linthresh=thresh,vmin=mino, vmax=maxo) if log == True else None))
+        
+        cont = []
+        if imtype == 'contour' or imtype == 'both':
+            xy = self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()
+            if type(levels)==int and log == True:
+                for thing in [mino,maxo,levels,thresh]:print(thing)
+                plt_levels = sym_logspace(mino,maxo,levels,thresh)
+            elif type (levels) == int:
+                plt_levels = np.linspace(mino,maxo,levels)
+            else: plt.levels = levels
+            cont = plt.contour(self.v_data['x'],self.v_data['y'],xy,
+                               norm=(colors.SymLogNorm(linthresh=thresh,vmin=mino, vmax=maxo) if log == True else None),
+                             levels = plt_levels,)
+        
+        self.show(fig = fig,ax = ax,show_mirror = True)
+        # return(cont)
+        if im or cont:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            if im:
+                cbar = plt.colorbar(im,ax = ax,label = colorbar_name,cax = cax)
+                # if cont:
+                #     cbar.set_ticks(cont.levels)
+                #     cbar.set_ticklabels(cont.levels)
+            if cont:
+                # print(cont.levels)
+                tickmax = 15
+                skipo = int(len(cont.levels)/tickmax)+1
+                cbar = plt.colorbar(cont,ax = ax,label = colorbar_name,cax = cax)
+                cbar.set_ticks(cont.levels.round(0)[::skipo])
+                cbar.set_ticklabels(cont.levels.round(0)[::skipo])
+                # cbar.set_ticklabels(cbar.get_ticklabels()[::2])
+        plt.tight_layout()
+        ax.set_xlim(min(self.v_data['x']),max(self.v_data['x']))
+        ax.set_ylim(min(self.v_data['y']),max(self.v_data['y']))
+        return(fig,ax)
+
+    def interp_pe(self,param = 'v'):
+        from scipy.interpolate import interp2d
+        return(interp2d(self.v_data['x'],self.v_data['y'],
+                        self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()))
+
 
 def str_data_scrape(outs,n_parts,cores,quiet):
     tot_lines = []
@@ -541,13 +866,25 @@ def str_data_scrape(outs,n_parts,cores,quiet):
 
 def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality = 3):
     checks = []
+    #old code updated for active splitting
+    # fly_fils = []
+    # sim.parts.n = int(n_parts/cores)
+
+    # for i in range(int(cores)):
+    #     fly_fil = sim.home+'auto_fly_%i.ion'%i
+    #     fly_fils.append(fly_fil)
+    #     sim.parts.fil = fly_fil
+    #     print(sim.parts.fil)
+    #     sim.parts.ion_print()
+
     fly_fils = []
-    sim.parts.n = int(n_parts/cores)
     for i in range(int(cores)):
-        fly_fil = sim.home+'auto_fly_%i.ion'%i
-        fly_fils.append(fly_fil)
-        sim.parts.fil = fly_fil
-        sim.parts.ion_print()
+        pt = os.path.join(sim.home,'auto_fly_%i.ion'%i)
+        fly_fils.append(pt)
+
+    sim.parts.n = n_parts
+    sim.parts.fil = fly_fils
+    sim.parts.ion_print()
 
     for ion_fil in fly_fils:
         loc_com = r"fly  "
@@ -555,8 +892,8 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
         loc_com+=r" --trajectory-quality=%d"%trajectory_quality
         if markers !=0:
             loc_com+=r" --markers=%d"%markers
-        loc_com+=r" --recording=%s"%(sim.recfil if rec_fil == '' else rec_fil)
-        loc_com += r" --particles=" + ion_fil
+        loc_com+=r" --recording=%s"%(sim.recfil if rec_fil == '' else rec_fil).strip(sim.home)
+        loc_com += r" --particles=%s"%ion_fil.strip(sim.home)
         loc_com += r" %s"%sim.bench
         sim.commands = loc_com
         f = tmp.TemporaryFile()
