@@ -798,7 +798,7 @@ class simion:
                 plt_levels = sym_logspace(mino,maxo,levels,thresh)
             elif type (levels) == int:
                 plt_levels = np.linspace(mino,maxo,levels)
-            else: plt.levels = levels
+            else: plt_levels = levels
             cont = plt.contour(self.v_data['x'],self.v_data['y'],xy,
                                norm=(colors.SymLogNorm(linthresh=thresh,vmin=mino, vmax=maxo) if log == True else None),
                              levels = plt_levels,)
