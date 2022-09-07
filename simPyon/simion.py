@@ -750,6 +750,7 @@ class simion:
         from matplotlib import cm,ticker
         from mpl_toolkits.axes_grid1 import make_axes_locatable
         from scipy.ndimage import gaussian_filter as gf
+        import matplotlib.colors as colors
         fig,ax = plt.subplots()
         im = []
         xy = self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()
@@ -782,7 +783,6 @@ class simion:
             xy[np.isnan(xy)] = gf(np.nan_to_num(xy),sigma = 2)[np.isnan(xy)]
 
             # if log == True:/
-            import matplotlib.colors as colors
             
             # xy = gf(np.nan_to_num(xy),gaussian_sigma)/gf(xy,gaussian_sigma)
             im = plt.pcolormesh(x,y,xy, cmap = cmap,
