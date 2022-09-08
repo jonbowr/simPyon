@@ -1,5 +1,8 @@
 from matplotlib import pyplot as plt
 from matplotlib import patches
+from matplotlib.patches import Polygon
+from shapely import geometry as geo
+from descartes import PolygonPatch
 import numpy as np
 
 
@@ -572,6 +575,7 @@ class label:
         print('We are Disconnected: Press Any key to continue')
 
 
+
 class line_draw:
     def __init__(self,fig,ax):
         self.fig = fig
@@ -580,6 +584,9 @@ class line_draw:
         self.line_verts = []
         self.clickd = False
         self.active = True
+        self.fatter = False
+        self.fat_line = []
+        self.poly_verts = []
 
     def connect(self):
         print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
@@ -590,9 +597,9 @@ class line_draw:
 
     def onclick(self,event):
         if plt.get_current_fig_manager().toolbar.mode != '': return
-        if self.active == False: return
+        if self.active==False: return
 
-        if event.xdata != None and event.ydata !=None:
+        if event.xdata != None and event.ydata !=None and event.dblclick == False:
             self.clickd = True
             self.lines.append(self.ax.plot(event.xdata,event.ydata)[0])
             self.line_verts.append([[event.xdata,event.ydata]])
@@ -600,9 +607,81 @@ class line_draw:
             self.fig.canvas.flush_events()
         elif event.ydata == None and event.dblclick == True:
             self.disconnect()
+        elif event.ydata != None and event.dblclick == True:
+            def smooth(arr,itterations=1):
+                for i in range(itterations):
+                    smoot=np.zeros(len(arr))
+                    smoot[0]=np.nanmean([arr[0],arr[1]])
+                    smoot[1:-1]=np.nanmean(np.stack([arr[0:-2],arr[1:-1],arr[2:]]),axis = 0)
+                    smoot[-1]=np.nanmean([arr[-1],arr[-2]])
+                    arr=smoot
+                return(arr)
+            d = 2
+            w = 1
+            pts_mm = 5
+            from scipy.interpolate import interp1d
+            if self.fatter ==False:
+
+                self.fatter = True
+                line = self.lines[0]
+                line.set_solid_capstyle('round')
+                line_verts = np.stack(line.get_data()).T
+                poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
+
+                self.fat_line = self.ax.add_patch(patches.Polygon(poly_verts))
+                # self.fat_line = self.ax.plot(poly_verts[:,0],poly_verts[:,1])
+                self.fig.canvas.draw()
+                # check = '1'
+                
+                poly_verts[:,0] = smooth(poly_verts[:,0],2)
+                poly_verts[:,1] = smooth(poly_verts[:,1],2)
+                self.poly_verts = poly_verts
+                self.fig.canvas.draw()
+                self.fig.canvas.flush_events()
+                # qeqFREQFGRS
+            poly_verts = self.poly_verts
+
+            L = np.zeros(len(poly_verts)) 
+
+            L[1:] = np.cumsum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
+                                         axis = 1)))
+            fx = interp1d(L,poly_verts[:,0],kind = 'cubic')
+            fy = interp1d(L,poly_verts[:,1],kind = 'cubic')
+            # f_got = interp1d(L,got_edge,kind = 'linear')
+
+            poly_verts = np.zeros((int(L[-1]*pts_mm),2))
+            # # poly_verts = np.zeros((len(og_verts)*w,2))
+            poly_verts[:,0] = fx(np.linspace(min(L),max(L),len(poly_verts)))
+            poly_verts[:,1] = fy(np.linspace(min(L),max(L),len(poly_verts)))
+
+            rec_verts = np.zeros((len(poly_verts)+2,poly_verts.shape[1]))
+            rec_verts[1:-1,:] = poly_verts[:,:]
+            rec_verts[0,:] = poly_verts[-2,:]
+            rec_verts[-1,:] = poly_verts[1,:]
+
+            poly_delt = ((rec_verts[2:,:]-rec_verts[:-2,:])+
+                     (rec_verts[1:-1,:]-rec_verts[:-2,:])+
+                     (rec_verts[2:,:]-rec_verts[1:-1,:]))/3
+
+            ang = np.arctan2(poly_delt[:,1],poly_delt[:,0])
+            dx = np.sin(ang)*d
+            dy = np.cos(ang)*d
+            poly_verts[:,0] += -dx
+            poly_verts[:,1] += dy
+
+            over = self.fat_line.get_path().contains_points(poly_verts)
+            poly_verts = poly_verts[~over]
+
+            self.fat_line.set_xy(poly_verts)
+            self.poly_verts = poly_verts
+            self.ax.plot(self.poly_verts[:,0],self.poly_verts[:,1])
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+
 
     def on_motion(self,event):
         if self.clickd:
+
             self.line_verts[-1].append([event.xdata,event.ydata])
             self.lines[-1].set_xdata(np.array(self.line_verts[-1])[:,0])
             self.lines[-1].set_ydata(np.array(self.line_verts[-1])[:,1])
@@ -631,7 +710,9 @@ class line_draw:
         self.fig.canvas.mpl_disconnect(self.cidpress)
         self.fig.canvas.mpl_disconnect(self.cidrelease)
         self.fig.canvas.mpl_disconnect(self.cidmotion)
+        self.active = False
         print('We are Disconnected: Press Any key to continue')
+
 
 
 
@@ -806,3 +887,115 @@ class show_pts:
         self.fig.canvas.mpl_disconnect(self.cidpress)
         self.fig.canvas.mpl_disconnect(self.cidrelease)
         self.fig.canvas.mpl_disconnect(self.cidmotion)
+
+class find_surface:
+        def __init__(self,fig,ax,geom):
+            self.fig = fig
+            self.ax = ax
+            self.lines = []
+            self.line_verts = []
+            self.clickd = False
+            self.active = True
+            self.fatter = False
+            self.fat_line = []
+            self.fat_patch = []
+            self.poly_verts = []
+            self.geom = geom
+            self.diff = []
+            self.poly = []
+            self.w = 1
+            self.lin_fat = []
+
+        def connect(self):
+            print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
+            self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+            self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+            self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+            return(self)
+
+        def onclick(self,event):
+            if plt.get_current_fig_manager().toolbar.mode != '': return
+            if self.active==False: return
+
+            if event.xdata != None and event.ydata !=None and event.dblclick == False:
+                self.clickd = True
+                self.lines.append(self.ax.plot(event.xdata,event.ydata)[0])
+                self.line_verts.append([[event.xdata,event.ydata]])
+                self.fig.canvas.draw()
+                self.fig.canvas.flush_events()
+            elif event.ydata == None and event.dblclick == True:
+                self.disconnect()
+            elif event.ydata != None and event.dblclick == True:
+                def smooth(arr,itterations=1):
+                    for i in range(itterations):
+                        smoot=np.zeros(len(arr))
+                        smoot[0]=np.nanmean([arr[0],arr[1]])
+                        smoot[1:-1]=np.nanmean(np.stack([arr[0:-2],arr[1:-1],arr[2:]]),axis = 0)
+                        smoot[-1]=np.nanmean([arr[-1],arr[-2]])
+                        arr=smoot
+                    return(arr)
+                d = 2
+                
+                pts_mm = 5
+                from scipy.interpolate import interp1d
+                if self.fatter ==False:
+
+                    self.fatter = True
+                    line = self.lines[0]
+                    line.set_solid_capstyle('round')
+                    line_verts = np.stack(line.get_data()).T
+                    poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
+
+
+                    self.fat_line = geo.LineString(self.line_verts[0])
+
+                    self.fat_patch = self.ax.add_patch(PolygonPatch(self.fat_line))
+                    self.poly_verts = poly_verts
+                try:
+                    self.fat_line = self.fat_line.buffer(.5)
+                    self.fat_line = self.fat_line.difference(self.geom)
+                    self.fat_patch = self.ax.add_patch(PolygonPatch(self.fat_line))
+                    poly_verts = np.array(self.fat_line.exterior.coords.xy).T
+                except: pass
+
+                self.poly_verts = poly_verts
+
+                # self.ax.plot(self.poly_verts[:,0],self.poly_verts[:,1],'.-')
+                self.fig.canvas.draw()
+                self.fig.canvas.flush_events()
+                self.w +=1
+
+
+        def on_motion(self,event):
+            if self.clickd:
+
+                self.line_verts[-1].append([event.xdata,event.ydata])
+                self.lines[-1].set_xdata(np.array(self.line_verts[-1])[:,0])
+                self.lines[-1].set_ydata(np.array(self.line_verts[-1])[:,1])
+                self.fig.canvas.draw()
+        
+        def on_release(self,event):
+            self.clickd = False
+
+        def tot_clear(self):
+            for lin in self.lines:
+                lin.remove()
+            self.lines = []
+            self.line = self.ax.plot([0,0],[0,0])[0]
+            self.line_verts = []
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+
+        def clear(self):
+            self.lines[-1].remove()
+            self.lines = self.lines[:-1]
+            self.line_verts = self.line_verts[:-1]
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+
+        def disconnect(self):
+            self.fig.canvas.mpl_disconnect(self.cidpress)
+            self.fig.canvas.mpl_disconnect(self.cidrelease)
+            self.fig.canvas.mpl_disconnect(self.cidmotion)
+            self.active = False
+            print('We are Disconnected: Press Any key to continue')

@@ -866,17 +866,6 @@ def str_data_scrape(outs,n_parts,cores,quiet):
 
 def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality = 3):
     checks = []
-    #old code updated for active splitting
-    # fly_fils = []
-    # sim.parts.n = int(n_parts/cores)
-
-    # for i in range(int(cores)):
-    #     fly_fil = sim.home+'auto_fly_%i.ion'%i
-    #     fly_fils.append(fly_fil)
-    #     sim.parts.fil = fly_fil
-    #     print(sim.parts.fil)
-    #     sim.parts.ion_print()
-
     fly_fils = []
     for i in range(int(cores)):
         pt = os.path.join(sim.home,'auto_fly_%i.ion'%i)

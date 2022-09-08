@@ -656,8 +656,84 @@ def check_voltage(gemfile,volts):
                              color = pl.cm.plasma(arr[-1]/1000))
     return(elec_check)
 
+def grow_line(line,fig,ax, d = .2,pts_mm = 5,edge_buff = .2):
+    from scipy.interpolate import interp1d
+    def smooth(arr,itterations=1):
+        for i in range(itterations):
+            smoot=np.zeros(len(arr))
+            smoot[0]=np.nanmean([arr[0],arr[1]])
+            smoot[1:-1]=np.nanmean(np.stack([arr[0:-2],arr[1:-1],arr[2:]]),axis = 0)
+            smoot[-1]=np.nanmean([arr[-1],arr[-2]])
+            arr=smoot
+        return(arr)
+    line.set_solid_capstyle('round')
+    line_verts = np.stack(line.get_data()).T
+    poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
+    polyline = ax.add_patch(Polygon(poly_verts))
+    check = '1'
+    w = 1
 
-def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
+    poly_verts[:,0] = smooth(poly_verts[:,0],2)
+    poly_verts[:,1] = smooth(poly_verts[:,1],2)
+    og_verts = poly_verts.copy() 
+    og_L = np.sum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
+                                     axis = 1)))
+    got_edge = np.zeros(len(poly_verts)).astype(bool)
+
+    print('press any key to grow, q to quit')
+    while check != 'q':
+
+        L = np.zeros(len(poly_verts)) 
+        L[1:] = np.cumsum(np.sqrt(np.sum((poly_verts[1:,:]-poly_verts[:-1,:])**2,
+                                     axis = 1)))
+        fx = interp1d(L,poly_verts[:,0],kind = 'cubic')
+        fy = interp1d(L,poly_verts[:,1],kind = 'cubic')
+        f_got = interp1d(L,got_edge,kind = 'linear')
+
+        poly_verts = np.zeros((int(L[-1]*pts_mm),2))
+        # poly_verts = np.zeros((len(og_verts)*w,2))
+        poly_verts[:,0] = fx(np.linspace(min(L),max(L),len(poly_verts)))
+        poly_verts[:,1] = fy(np.linspace(min(L),max(L),len(poly_verts)))
+        got_edge = f_got(np.linspace(min(L),max(L),len(poly_verts))).round().astype(bool)
+
+        rec_verts = np.zeros((len(poly_verts)+2,poly_verts.shape[1]))
+        rec_verts[1:-1,:] = poly_verts[:,:]
+        rec_verts[0,:] = poly_verts[-2,:]
+        rec_verts[-1,:] = poly_verts[1,:]
+
+        poly_delt = ((rec_verts[2:,:]-rec_verts[:-2,:])+
+                     (rec_verts[1:-1,:]-rec_verts[:-2,:])+
+                     (rec_verts[2:,:]-rec_verts[1:-1,:]))/3
+
+        ang = np.arctan2(poly_delt[:,1],poly_delt[:,0])
+        dx = np.sin(ang)*d
+        dy = np.cos(ang)*d
+        
+        e_dx = np.sin(ang)*edge_buff
+        e_dy = np.cos(ang)*edge_buff
+        
+        # got_edge = np.logical_or(got_edge,
+        #                          np.logical_or(\
+        #                         img[((poly_verts[:,1] + e_dy)*pxls_mm).round().astype(int),
+        #                         ((poly_verts[:,0] - e_dx)*pxls_mm).round().astype(int)],
+        #                         img[((poly_verts[:,1])*pxls_mm).round().astype(int),
+        #                         ((poly_verts[:,0])*pxls_mm).round().astype(int)]))
+
+        poly_verts[:,0] += -dx
+        poly_verts[:,1] += dy
+
+        over = polyline.get_path().contains_points(poly_verts)
+        poly_verts = poly_verts[~over]
+        # got_edge = got_edge[np.logical_or(got_edge,~over)]
+        polyline.set_xy(poly_verts)
+        w+=1
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+        # fig.ginput(1)
+        # check = input('press any key to grow, q to quit')
+    return(poly_verts)
+
+def find_surface(gemfile,line,img = [], d = .2,pts_mm = 5,edge_buff = .2):
     #==============================================================================
     # Function find surface: identifies electrode surface and normal direction
     # input:
@@ -682,11 +758,18 @@ def find_surface(gemfile,img = [], d = .2,pts_mm = 5,edge_buff = .2):
 
     # fig,ax,elec_patches = gem_draw_poly(gemfile,path_out = True)
     from .poly_gem import draw
-    fig,ax = draw(gemfile)
     
-    lin_drw = meat.line_draw(fig,ax).connect()
-    input('Hit a key when done drawing')
-    line =lin_drw.lines[-1]
+    fig,ax = draw(gemfile)
+    fig.canvas.draw()
+
+    # lin_drw = meat.line_draw(fig,ax)
+    # lin_drw.connect()
+    # fig.canvas.draw()
+    # fig.canvas.draw()
+    # plt.ginput(2)
+    # input('Hit a key when done drawing')
+    # line = lin_drw.lines[-1]
+
     line.set_solid_capstyle('round')
     line_verts = np.stack(line.get_data()).T
     poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
