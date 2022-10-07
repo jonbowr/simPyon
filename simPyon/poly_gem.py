@@ -3,6 +3,7 @@ from descartes import PolygonPatch
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
+plt.ion()
 
 class gem_poly:
     

@@ -901,13 +901,13 @@ class find_surface:
             self.fat_patch = []
             self.poly_verts = []
             self.geom = geom
-            self.diff = []
-            self.poly = []
-            self.w = 1
-            self.lin_fat = []
+            self.w = .5
+            self.g_verts = []
 
         def connect(self):
-            print('Fig Measure connected:\nDouble Click outside Plot to Disconnect')
+            print('Surface Finder connected:\nDouble Click outside Plot to Disconnect')
+            print('Draw line, Double click within plot to grow')
+            print('Selected Vertices determined on disconnect')
             self.cidpress = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
             self.cidrelease = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
             self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
@@ -934,7 +934,7 @@ class find_surface:
                         smoot[-1]=np.nanmean([arr[-1],arr[-2]])
                         arr=smoot
                     return(arr)
-                d = 2
+
                 
                 pts_mm = 5
                 from scipy.interpolate import interp1d
@@ -944,26 +944,30 @@ class find_surface:
                     line = self.lines[0]
                     line.set_solid_capstyle('round')
                     line_verts = np.stack(line.get_data()).T
-                    poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
-
+                    # poly_verts = np.concatenate((line_verts,np.flipud(line_verts)[1:]))
 
                     self.fat_line = geo.LineString(self.line_verts[0])
-
-                    self.fat_patch = self.ax.add_patch(PolygonPatch(self.fat_line))
-                    self.poly_verts = poly_verts
-                try:
-                    self.fat_line = self.fat_line.buffer(.5)
+                    
+                    self.fat_line = self.fat_line.buffer(self.w)
                     self.fat_line = self.fat_line.difference(self.geom)
-                    self.fat_patch = self.ax.add_patch(PolygonPatch(self.fat_line))
-                    poly_verts = np.array(self.fat_line.exterior.coords.xy).T
-                except: pass
+                    if type(self.fat_line) == geo.multipolygon.MultiPolygon:
+                            self.fat_line = self.fat_line[0]
+                    self.poly_verts = np.array(self.fat_line.exterior.coords.xy).T
+                    self.fat_patch = self.ax.add_patch(Polygon(self.poly_verts))
+
+                else:
+                    try:
+                        self.fat_line = self.fat_line.buffer(self.w)
+                        self.fat_line = self.fat_line.difference(self.geom)
+                        if type(self.fat_line) == geo.multipolygon.MultiPolygon:
+                            self.fat_line = self.fat_line[0]
+                        poly_verts = np.array(self.fat_line.exterior.coords.xy).T
+                        self.fat_patch.set_xy(poly_verts)
+                    except: pass
 
                 self.poly_verts = poly_verts
-
-                # self.ax.plot(self.poly_verts[:,0],self.poly_verts[:,1],'.-')
                 self.fig.canvas.draw()
                 self.fig.canvas.flush_events()
-                self.w +=1
 
 
         def on_motion(self,event):
@@ -998,4 +1002,13 @@ class find_surface:
             self.fig.canvas.mpl_disconnect(self.cidrelease)
             self.fig.canvas.mpl_disconnect(self.cidmotion)
             self.active = False
+            try:
+                self.g_verts = np.concatenate([
+                                    np.concatenate([
+                                        np.array(c.coords),
+                                        np.ones([1,2])*np.nan],
+                                        axis = 0)
+                                 for c in geo.LineString(self.poly_verts).intersection(self.geom.buffer(self.w/100))])
+            except: pass
+            self.ax.plot(*self.g_verts.T,'.')
             print('We are Disconnected: Press Any key to continue')

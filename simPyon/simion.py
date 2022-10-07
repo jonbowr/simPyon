@@ -65,7 +65,8 @@ class simion:
                  gemfil = '',recfil = '',
                  traj_recfil = '',
                  bench = '',
-                 pa = ''):
+                 pa = ''
+                 ):
         self.commands = []
         self.home = home
         self.sim = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
@@ -82,32 +83,7 @@ class simion:
         self.trajectory_quality = 3
         self.scale_exclude = []
 
-        # Grab workbench, potential arrays and gemfiles from current directory
-        self.bench = ''
-        if bench == '':
-            for file in os.listdir(home):
-                if file.endswith(".iob"):
-                    self.bench = os.path.join(home,file)
-        else:
-            self.bench = os.path.join(home,bench)
 
-        if not pa:
-            self.pa = []
-            for root,dirs,files in os.walk(home):
-                for file in files:
-                    if file.endswith(".pa0"):
-                        self.pa.append(os.path.join(root,file).strip('0'))
-        elif type(pa)== str:
-            self.pa = [os.path.join(home,pa)]
-        elif type(pa) == list:
-            self.pa = [os.path.join(home,p) for p in pa]
-        # if gemfil =='':
-        #     # self.gemfil = []
-        #     for file in os.listdir(home):
-        #         if file.lower().endswith(".gem"):
-        #             self.gemfil = os.path.join(home,file)
-        #             # self.gemfil.append(os.path.join(home,file))
-        
         if gemfil =='':
             self.gemfil = []
             for root,dirs,files in os.walk(home):
@@ -122,6 +98,30 @@ class simion:
             self.gemfil = [os.path.join(home,gemfil)]
 
 
+        # Grab workbench, potential arrays and gemfiles from current directory
+        # self.bench = ''
+        if bench == '':
+            self.bench = os.path.join(home,'simPyon_bench.iob')
+            copy("%s/bench/simPyon_bench_%d.iob"%(\
+                            os.path.dirname(os.path.dirname(__file__)+'..'),
+                            len(self.gemfil)),
+                            self.bench)
+        else:
+            Warning("SimPyon updated to work best with default workbench file")
+            self.bench = os.path.join(home,bench)
+
+        self.pa = [os.path.join(home,'simPyon%d.pa'%pan) for pan in range(len(self.gemfil))]
+        # if not pa:
+        #     self.pa = []
+        #     for root,dirs,files in os.walk(home):
+        #         for file in files:
+        #             if file.endswith(".pa0"):
+        #                 self.pa.append(os.path.join(root,file).strip('0'))
+        # elif type(pa)== str:
+        #     self.pa = [os.path.join(home,pa)]
+        # elif type(pa) == list:
+        #     self.pa = [os.path.join(home,p) for p in pa]
+
         self.name = self.gemfil[0].upper().strip('.GEM')
         #scrape the gemfile for numbers
         self.pa_info = []
@@ -130,16 +130,25 @@ class simion:
             self.get_elec_nums_gem(gm)
             self.gem_nums.append(gem.get_elec_nums_gem(gm)[0])
             self.pa_info.append(gem.get_pa_info(gm))
+
+        pa = 1
+        for pai in self.pa_info:
+            if 'pa_offset_position' in pai:
+                self.usr_prgm+='\nfunction segment.initialize_run() \n'
+                for d,v in zip(['x','y','z'],pai['pa_offset_position']):
+                    self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
+                pa +=1
+                self.usr_prgm+='end \n'
+                
         self.geo = geo(self.gemfil)
+
 
     def __repr__(self):
         return('%s \n'%str(type(self))+
                 'Workbench:%s \n'%self.bench +
                 'Gemfile: %s \n'%self.gemfil+
                 'Pa: %s \n'%self.pa)
-        # print(type(self))
-        # print(self.gemfil)
-        # print()
+        
 
     def gem2pa(self,gemfil = [], pa = None,pa_tag = '#'):
         '''
@@ -281,7 +290,7 @@ class simion:
         return(self)  
 
     def fly(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
-            quiet = False):
+            quiet = True):
         '''
         Fly n_parts particles using the particle probability distributions defined in self.parts. 
         Parallelizes the fly processes by spawing a number of instances associated with the
@@ -337,7 +346,7 @@ class simion:
 
 
     def fly_trajectory(self,n_parts = 100,cores = multiprocessing.cpu_count(),
-                      quiet = False, dat_step = 30,show= True,geo_3d = False,
+                      quiet = True, dat_step = 30,show= True,geo_3d = False,
                       fig = [],ax = [],cmap = 'eng',eng_cmap = cm.plasma,plt_kwargs = {},
                       show_cbar = True,label = '',xlim = [-np.inf,np.inf]):
         '''
@@ -443,7 +452,7 @@ class simion:
 
                 # ax.set_aspect('equal')
                 return(fig,ax)
-        return(self)
+        return(fig,ax)
 
     def get_elec_nums_gem(self, gem_fil=[]):
         '''
@@ -710,10 +719,10 @@ class simion:
         dat = str_data_scrape(core_fly(self,len(xy),cores,quiet = False,
                                         rec_fil = self.home+'simPyon_pe.rec',
                                         trajectory_quality=0),len(xy),cores,quiet = False)
-        v_full = np.zeros(len(xy))
-        v_full[dat[:,0].astype(int)-1] = dat[:,5]
+        # v_full = np.zeros(len(xy))
+        # v_full[dat[:,0].astype(int)-1] = dat[:,5]
 
-        v_full = np.zeros((len(xy),2))*np.nan
+        v_full = np.zeros((len(xy),3))*np.nan
         v_full[dat[:,0].astype(int)-1] = dat[:,4:]
 
         v_dat = {}
@@ -722,7 +731,7 @@ class simion:
         v_dat['xy'] = xy
         v_dat['v'] = v_full[:,0]
         v_dat['grad v'] = v_full[:,1]
-
+        v_dat['B'] = v_full[:,2]
 
         self.v_data = v_dat
         self.parts = store_parts
