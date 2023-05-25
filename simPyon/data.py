@@ -70,10 +70,10 @@ class sim_data:
                     if len(data)!=0:
                         starts = log_starts(self.df['ion n'])
                         stops = log_stops(self.df['ion n'])
-                        print('stop_no: %d'%np.sum(stops))
+                        # print('stop_no: %d'%np.sum(stops))
 
-                        print('start_no: %d'%np.sum(starts))
-                        print('start_no: %d'%np.sum(starts[stops]))
+                        # print('start_no: %d'%np.sum(starts))
+                        # print('start_no: %d'%np.sum(starts[stops]))
                         starty = min(self.df['r'][starts])
 
                         # self.df['counts'][starts] = self.df['r'][starts] / starty
