@@ -10,7 +10,7 @@ import math
 from matplotlib import pyplot as plt
 from . import gem
 from .geo import geo
-from .particles import auto_parts
+from .particles import auto_parts,source
 from .data import sim_data
 from ..defaults import *
 from shutil import copy
@@ -78,7 +78,7 @@ class simion:
         self.recfil = recfil
         self.data = []
         self.v_data = []
-        self.parts = auto_parts()
+        self.source = auto_parts()
         self.traj_refil = traj_recfil
         self.trajectory_quality = 3
         self.scale_exclude = []
@@ -292,7 +292,7 @@ class simion:
     def fly(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
             quiet = True):
         '''
-        Fly n_parts particles using the particle probability distributions defined in self.parts. 
+        Fly n_parts particles using the particle probability distributions defined in self.source. 
         Parallelizes the fly processes by spawing a number of instances associated with the
         number of cores of the processing computer. Resulting particle data is stored in 
         self.data as a simPyon.data.sim_data object. 
@@ -310,6 +310,7 @@ class simion:
             instances is printed to cmd. 
         '''
 
+
         # copy rec file to home directory if none already exists
         if self.recfil == '':
             self.recfil = os.path.join(self.home,'simPyon_base.rec')
@@ -317,12 +318,15 @@ class simion:
                             os.path.dirname(os.path.dirname(__file__)+'..'),
                             self.recfil)
 
-
         # Write the workbench program in 'usr_prgm'
         if self.bench:
             with open(self.bench.replace('iob','lua'),'w') as fil:
                 fil.write(self.usr_prgm)
 
+
+        # if type(n_parts) == sim_data:
+        #     for 
+        #     self.source.df
 
         start_time = time.time()
 
@@ -351,7 +355,7 @@ class simion:
                       show_cbar = True,label = '',xlim = [-np.inf,np.inf]):
         '''
         Fly n_parts particles, and plot their trajectories. Uses the particle probability 
-        distributions defined in self.parts, but tracks the particle movement. 
+        distributions defined in self.source, but tracks the particle movement. 
         Parallelizes the fly processes by spawing a number of instances associated with the
         number of cores of the processing computer. Resulting particle data is stored in 
         self.traj_data as a list of dictionaries. 
@@ -415,15 +419,15 @@ class simion:
                     self.show(fig = fig,ax = ax)
                 for traj in self.traj_data:
                     if cmap == 'eng':
-                        plt_kwargs['color'] = eng_cmap(traj['ke'][0]/np.max(self.parts.ke.dist_out))
+                        plt_kwargs['color'] = eng_cmap(traj['ke'][0]/np.max(self.source['ke'].dist_out))
                     ax.plot(traj[self.pa_info[0]['base']],traj['r'],**plt_kwargs)
                 ax.plot(traj[self.pa_info[0]['base']],traj['r'],label = label)
                 if cmap == 'eng' and show_cbar == True:
                     divider = make_axes_locatable(ax)
                     cax = divider.append_axes("right", size="5%", pad=0.05)
                     cbar = plt.colorbar(plt.cm.ScalarMappable(cmap=eng_cmap, 
-                                                    norm=plt.Normalize(vmin=np.nanmin(self.parts.ke.dist_out), 
-                                                                       vmax=np.nanmax(self.parts.ke.dist_out))),
+                                                    norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
+                                                                       vmax=np.nanmax(self.source['ke'].dist_out))),
                                             ax = ax,label = 'Ke [eV]',cax = cax)
             if geo_3d == True:
                 from mpl_toolkits.mplot3d import Axes3D,art3d
@@ -694,9 +698,9 @@ class simion:
         p_source.pos = source('fixed_vector',len(xy))
         p_source.pos['vector'] = xy
 
-        store_parts = self.parts
+        store_parts = self.source
 
-        self.parts = p_source
+        self.source = p_source
 
 
         copy("%s/rec/simPyon_pe.rec"%\
@@ -721,7 +725,7 @@ class simion:
         v_dat['B'] = v_full[:,2]
 
         self.v_data = v_dat
-        self.parts = store_parts
+        self.source = store_parts
         # return(v_dat)
 
     def show_pe(self,param = 'v',cmap = cm.jet,vmax = None,
@@ -863,9 +867,9 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
         pt = os.path.join(sim.home,'auto_fly_%i.ion'%i)
         fly_fils.append(pt)
 
-    sim.parts.n = n_parts
-    sim.parts.fil = fly_fils
-    sim.parts.ion_print()
+    sim.source.n = n_parts
+    sim.source.fil = fly_fils
+    sim.source.ion_print()
 
     for ion_fil in fly_fils:
         loc_com = r"fly  "

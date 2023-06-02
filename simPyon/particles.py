@@ -349,28 +349,28 @@ class source:
 class auto_parts:
     
     def __init__(self, fil='auto_ion.ion', n=10000):
-        # from ..defaults import KE_DIST_TYPE,KE_DIST_VALS,\
-        #         AZ_DIST_TYPE,AZ_DIST_VALS,EL_DIST_TYPE,\
-        #         EL_DIST_VALS,POS_DIST_TYPE,POS_DIST_VALS,\
-        #         MASS,CHARGE
-
         self.n = n
         self.mass = MASS
         self.charge = CHARGE
         self.fil = fil
-
         # distribution defaults
-        self.ke = source(str(KE_DIST_TYPE),n)
-        self.ke.dist_vals = KE_DIST_VALS.copy()
+        self.ke = source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy())
+        self.az = source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy())
+        self.el = source(str(EL_DIST_TYPE),n,dist_val = EL_DIST_VALS.copy())
+        self.pos = source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())
+        self.df = pd.Series({'n':n,
+                              'mass':MASS,
+                              'charge':Charge,
+                              'ke':source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy()),
+                              'az':source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy()),
+                              'el':source(str(EL_DIST_TYPE),n,dist_val = EL_DIST_VALS.copy()),
+                              'pos':source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())})
 
-        self.az = source(str(AZ_DIST_TYPE),n)
-        self.az.dist_vals = AZ_DIST_VALS.copy()
-        
-        self.el = source(str(EL_DIST_TYPE),n)
-        self.el.dist_vals= EL_DIST_VALS.copy()
+    def __getitem__(self,item):
+        return(self.df[item])
 
-        self.pos = source(str(POS_DIST_TYPE),n)
-        self.pos.dist_vals = POS_DIST_VALS.copy()
+    def __setitem__(self,item,value):
+        self.df[item] = value
 
     def __call__(self):
         return({'n':self.n,
@@ -391,144 +391,46 @@ class auto_parts:
                   'pos':str(self.pos)}))
 
     def sample(self):
-        for samp_dist in [self.ke,self.az,self.el,self.pos]:
+        for samp_dist in [self['ke'],self['az'],self['el'],self['pos']]:
             if 'type' in samp_dist.dist_vals:
                 if samp_dist.dist_vals['type'] == 'parent':
-                    distor = samp_dist(n = self.n)
+                    distor = samp_dist(n = self['n'])
                     
-        for samp_dist in [self.ke,self.az,self.el,self.pos]:
+        for samp_dist in [self['ke'],self['az'],self['el'],self['pos']]:
             if 'type' in samp_dist.dist_vals:
                 pass
             else:
-                samp_dist(n = self.n)
+                samp_dist(n = self['n'])
         
-        for samp_dist in [self.ke,self.az,self.el,self.pos]:
+        for samp_dist in [self['ke'],self['az'],self['el'],self['pos']]:
             if 'type' in samp_dist.dist_vals:
                 if samp_dist.dist_vals['type'] == 'child':
-                    distor = samp_dist(n = self.n)
+                    distor = samp_dist(n = self['n'])
     # Ion File output headder
     #time of birth,mass,charge,x0,y0,z0,azimuth, elevation, energy, cfw, color
     def ion_print(self):
         self.sample()
-        ke = abs(self.ke.dist_out)
-        az = self.az.dist_out
-        el = self.el.dist_out
-        pos = self.pos.dist_out
+        ke = abs(self['ke'].dist_out)
+        az = self['az'].dist_out
+        el = self['el'].dist_out
+        pos = self['pos'].dist_out
+        charge = self['charge']
+        mass = self['mass']
+        x = pos[:,0]
+        y = pos[:,1]
 
         if type(self.fil) == str:
-            with open(self.fil, 'w') as fil:
-                for n in range(len(ke)):
-                    if np.sum(np.isnan(np.array([0,self.mass,self.charge,pos[n,0],pos[n,1],0,
+            fils = [self.fil]
+        else: fils = self.fil
+
+        sub_num = int(self.n/len(fils))
+        f_count = 0
+        for f in fils:
+            with open(f, 'w') as fil:
+                for n in range(f_count*sub_num,(f_count+1)*sub_num):
+                    if np.sum(np.isnan(np.array([0,mass,charge,x[n],y[n],0,
                          az[n],el[n],ke[n],1,1])))==0:
                         fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
                             (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
                              az[n],el[n],ke[n],1,1))
-        elif type(self.fil) == list:
-            sub_num = int(self.n/len(self.fil))
-            f_count = 0
-            for f in self.fil:
-                with open(f, 'w') as fil:
-                    for n in range(f_count*sub_num,(f_count+1)*sub_num):
-                        if np.sum(np.isnan(np.array([0,self.mass,self.charge,pos[n,0],pos[n,1],0,
-                             az[n],el[n],ke[n],1,1])))==0:
-                            fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                                (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
-                                 az[n],el[n],ke[n],1,1))
-                f_count +=1
-
-import pandas as pd
-class sim_parts:
-    
-    
-    def __init__(self, fil='auto_ion.ion', n=10000):
-        
-        # from ..defaults import KE_DIST_TYPE,KE_DIST_VALS,\
-        #         AZ_DIST_TYPE,AZ_DIST_VALS,EL_DIST_TYPE,\
-        #         EL_DIST_VALS,POS_DIST_TYPE,POS_DIST_VALS,\
-        #         MASS,CHARGE
-
-        self.n = n
-        # self.mass = source('single',n,{'value':MASS})
-        # # self.mass['value'] = Mass
-        
-        # self.charge = source('single',n,{'Value':CHARGE})
-        # self.charge['value'] = CHARGE
-        self.fil = fil
-
-        # distribution defaults
-        # self.ke = source(str(KE_DIST_TYPE),n,KE_DIST_VALS.copy())
-        # # self.ke.dist_vals = KE_DIST_VALS.copy()
-
-        # self.az = source(str(AZ_DIST_TYPE),n,AZ_DIST_VALS.copy())
-        # # self.az.dist_vals = AZ_DIST_VALS.copy()
-        
-        # self.el = source(str(EL_DIST_TYPE),n,EL_DIST_VALS.copy())
-        # # self.el.dist_vals= EL_DIST_VALS.copy()
-
-        # self.pos = source(str(POS_DIST_TYPE),n,POS_DIST_VALS.copy())
-        # # self.pos.dist_vals = POS_DIST_VALS.copy()
-
-        self.source = {
-                        'mass':source('single',n,{'value':MASS}),
-                        'charge':source('single',n,{'value':CHARGE}),
-                        'ke':source(str(KE_DIST_TYPE),n,KE_DIST_VALS.copy()),
-                        'el':source(str(AZ_DIST_TYPE),n,AZ_DIST_VALS.copy()),
-                        'pos':source(str(POS_DIST_TYPE),n,POS_DIST_VALS.copy())
-                        }
-
-    def __call__(self):
-        return({nam:str(src) for nam,src in self.source.items()})
-        # return({'n':self.n,
-        #           'mass':self.mass,
-        #           'charge':self.charge,
-        #           'ke':str(self.ke),
-        #           'az':str(self.az),
-        #           'el':str(self.el),
-        #           'pos':str(self.pos)})
-    def __repr__(self):
-        return({nam:str(src) for nam,src in self.source.items()}.__repr__())
-
-    # def __str__(self):
-    #     return(({nam:str(src) for nam,src in self.source.items()}.__repr__()))
-
-    def sample(self):
-        return({lab:samp_dist(self.n) for lab,samp_dist in self.source.items()})
-
-    def to_flyfil(self):
-        d_sam= self.sample()
-
-    #         if 'type' in samp_dist.dist_vals:
-    #             if samp_dist.dist_vals['type'] == 'parent':
-    #                 distor = samp_dist(n = self.n)
-                    
-    #     for samp_dist in self.source.values():
-    #         if 'type' in samp_dist.dist_vals:
-    #             pass
-    #         else:
-    #             samp_dist(n = self.n)
-        
-    #     for samp_dist in self.source.values():
-    #         if 'type' in samp_dist.dist_vals:
-    #             if samp_dist.dist_vals['type'] == 'child':
-    #                 distor = samp_dist(n = self.n)
-    # # Ion File output headder
-    #time of birth,mass,charge,x0,y0,z0,azimuth, elevation, energy, cfw, color
-
-    # def get_ions(self):
-    #     self.sample()
-
-    def ion_print(self):
-        self.sample()
-        ke = abs(self.ke.dist_out)
-        az = self.az.dist_out
-        el = self.el.dist_out
-        pos = self.pos.dist_out
-
-        if type(self.fil) == str:
-            with open(self.fil, 'w') as fil:
-                for n in range(len(ke)):
-                    if np.sum(np.isnan(np.array([0,self.mass,self.charge,pos[n,0],pos[n,1],0,
-                         az[n],el[n],ke[n],1,1])))==0:
-                        fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                            (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
-                             az[n],el[n],ke[n],1,1))
+            f_count +=1
