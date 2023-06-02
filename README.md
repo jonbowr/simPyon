@@ -11,14 +11,9 @@ Then you should be able to just import simPyon the normal way:
 ```python
 from simPyon import * 
 ```
-### Prerequisites
-- SIMION 8.1.1.32 or higher
-- Python 3
-- NumPy
-- SciPy
-- Matplotlib
-- multiprocessing
-- subpprocess
+
+I would also just reccomend running with anaconda and loading the included simPyon anaconda environment .yaml. This will make the whole process of using the program much easier. 
+
 
 ### Adding SIMION to PATH
 Aside from having an updated version of Python 3 and SIMION installed, SIMION needs to be added to PATH so that it is accessable to  windows CMD. 
@@ -33,6 +28,15 @@ With the SIMION folder added to path you should be able to boot SIMION straight 
 > simion
 ``` 
 Make sure not to reassign that system variable, it will break this package. 
+
+### Prerequisites
+- SIMION 8.1.1.32 or higher
+- Python 3  ####
+- NumPy     ####
+- SciPy     ####
+- Matplotlib####
+- multiprocessing   ####
+- subpprocess ####
 
 ## Running SIMION
 

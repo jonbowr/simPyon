@@ -867,8 +867,6 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
     sim.parts.fil = fly_fils
     sim.parts.ion_print()
 
-    print(sim.recfil)
-    print(rec_fil)
     for ion_fil in fly_fils:
         loc_com = r"fly  "
         loc_com+=r" --retain-trajectories=0 --restore-potentials=0"
