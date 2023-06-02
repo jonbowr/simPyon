@@ -386,7 +386,7 @@ class simion:
         start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
         outs = core_fly(self,n_parts,cores,quiet,
-                        rec_fil = self.home + 'simPyon_traj.rec',
+                        rec_fil = os.path.join(self.home,'simPyon_traj.rec'),
                         markers = 20,trajectory_quality = 0)
         data = str_data_scrape(outs,n_parts,cores,quiet)
         
@@ -884,14 +884,16 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
     sim.parts.fil = fly_fils
     sim.parts.ion_print()
 
+    print(sim.recfil)
+    print(rec_fil)
     for ion_fil in fly_fils:
         loc_com = r"fly  "
         loc_com+=r" --retain-trajectories=0 --restore-potentials=0"
         loc_com+=r" --trajectory-quality=%d"%trajectory_quality
         if markers !=0:
             loc_com+=r" --markers=%d"%markers
-        loc_com+=r" --recording=%s"%(sim.recfil if rec_fil == '' else rec_fil).strip(sim.home)
-        loc_com += r" --particles=%s"%ion_fil.strip(sim.home)
+        loc_com+=r" --recording=%s"%(sim.recfil if rec_fil == '' else rec_fil)
+        loc_com += r" --particles=%s"%ion_fil
         loc_com += r" %s"%sim.bench
         sim.commands = loc_com
         f = tmp.TemporaryFile()

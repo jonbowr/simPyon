@@ -95,10 +95,6 @@ class pdf:
     def sputtered(x,a,b,c,d):
         # a = -2.06741184,b = 12.01113288,c =  0.76598885,d = 1.94674493
         # a,b,c,d = (-2.12621554, 12.28266708,  0.762046  ,  1.95374093)
-        # a = kwargs['a']
-        # b = kwargs['b']
-        # c = kwargs['c']
-        # d = kwargs['d']
         return(a*x - b*(x-c)**2+ d*np.log(x**(-d)))
 
     def cos(x,x_min):
@@ -151,7 +147,10 @@ class pdf:
                 }
     def __init__(self,f='sputtered',kwargs = {}):
         self.f =  self.func_dict[f]
-        self.kwargs = self.def_values[f]
+        self.kwargs = {}
+        for key,val in self.def_values[f].items():
+            self.kwargs[key] = val
+        # self.kwargs = self.def_values[f]
         for t in kwargs:
             self.kwargs[t] = kwargs[t]
 
