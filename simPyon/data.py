@@ -24,7 +24,10 @@ class sim_data:
                  headder = ["Ion N","TOF","X","Y","Z",
                             "Azm","Elv","Vx","Vy","Vz","KE"],
                  symmetry='cylindrical',
-                 mirroring='y'):
+                 mirroring='y',
+                 obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
+                        'R_MAX':R_MAX,'R_MIN':R_MIN,
+                        'TOF_MEASURE':TOF_MEASURE}):
 
         if type(data) is np.ndarray:
             self.header = headder
@@ -40,9 +43,7 @@ class sim_data:
             self.base_ax = base[mirroring]
 
             # load the detection parameters From defaults so they can be actively updated
-            self.obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
-                        'R_MAX':R_MAX,'R_MIN':R_MIN,
-                        'TOF_MEASURE':TOF_MEASURE}
+            self.obs = obs
 
             if symmetry == 'cylindrical'\
                      or symmetry =='cyl':

@@ -405,7 +405,6 @@ class simion:
 
         # Plot the trajectories
         if show == True:
-            # print(np.max(self.parts.ke.dist_out))
             if geo_3d == False:
                 if cmap == 'eng':
                     from matplotlib import cm
@@ -422,7 +421,6 @@ class simion:
                 if cmap == 'eng' and show_cbar == True:
                     divider = make_axes_locatable(ax)
                     cax = divider.append_axes("right", size="5%", pad=0.05)
-                    # if show_cbar == True:
                     cbar = plt.colorbar(plt.cm.ScalarMappable(cmap=eng_cmap, 
                                                     norm=plt.Normalize(vmin=np.nanmin(self.parts.ke.dist_out), 
                                                                        vmax=np.nanmax(self.parts.ke.dist_out))),
@@ -437,10 +435,6 @@ class simion:
                     vt = el[np.logical_and(el[:,0]>xlim[0],el[:,0]<xlim[1])]
                     ax.plot(vt[:,0],np.zeros(len(vt)),vt[:,1],
                             color = 'grey')
-                    # ax.plot(vt[:,0],np.zeros(len(vt)),-vt[:,1],
-                    #         color = 'grey')
-                    # ax.plot(vt[:,0],-vt[:,1],np.zeros(len(vt)),
-                    #         color = 'grey')
                         
                 for traj in self.traj_data:
                     ax.plot(traj['x'],-traj['z'],traj['y'])
@@ -449,8 +443,6 @@ class simion:
                 ax.set_xlim(0,200)
                 ax.set_ylim(-100,100)
                 
-
-                # ax.set_aspect('equal')
                 return(fig,ax)
         return(fig,ax)
 
@@ -567,7 +559,6 @@ class simion:
                 ax.scatter( x, y, c=z, **kwargs )
                 return ax
 
-            # density_scatter(self.data.stop()['x'],self.data.stop()['r'],ax1,bins = 100)
             ax1.plot(self.data.stop()['x'],self.data.stop()['r'],'.',color = 'r')
             ax1.plot(self.data.good().stop()['x'],self.data.good().stop()['r'],'.',color = 'blue')
 
@@ -576,11 +567,7 @@ class simion:
                 self.data.good().stop()()['y'], bins =int(30/10000*len(self.data['x'])/2),
                 weights =self.data.good().stop()()['counts'])
 
-            # density_scatter(self.data.good().stop()['z'],self.data.good().stop()['y'],ax2,bins = 100)
-
             density_scatter(self.data.good().stop()['z'],self.data.good().stop()['y'],ax2,bins = 100,weights = self.data.good().stop()['ke'])
-            # ax2.scatter(self.data.good().stop()()['z'],
-            # self.data.good().stop()()['y'], color = 'blue')
             ax2.set_xlabel('z [mm]')
             ax2.set_ylabel('y [mm]')
             cs = plt.contour((xbins[1:]+xbins[:-1])/2,
@@ -791,9 +778,6 @@ class simion:
                 xy = gauss_filt_nan(xy,gaussian_sigma)
             xy[np.isnan(xy)] = gf(np.nan_to_num(xy),sigma = 2)[np.isnan(xy)]
 
-            # if log == True:/
-            
-            # xy = gf(np.nan_to_num(xy),gaussian_sigma)/gf(xy,gaussian_sigma)
             im = plt.pcolormesh(x,y,xy, cmap = cmap,
                                 vmax = vmax,vmin = vmin,
                                 antialiased = True,shading = 'auto',
@@ -819,11 +803,10 @@ class simion:
             cax = divider.append_axes("right", size="5%", pad=0.05)
             if im:
                 cbar = plt.colorbar(im,ax = ax,label = colorbar_name,cax = cax)
-                # if cont:
-                #     cbar.set_ticks(cont.levels)
-                #     cbar.set_ticklabels(cont.levels)
+                if cont:
+                    cbar.set_ticks(cont.levels)
+                    cbar.set_ticklabels(cont.levels)
             if cont:
-                # print(cont.levels)
                 tickmax = 15
                 skipo = int(len(cont.levels)/tickmax)+1
                 cbar = plt.colorbar(cont,ax = ax,label = colorbar_name,cax = cax)
