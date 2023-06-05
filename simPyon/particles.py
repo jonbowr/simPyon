@@ -350,15 +350,15 @@ class auto_parts:
     
     def __init__(self, fil='auto_ion.ion', n=10000):
         import pandas as pd
-        self.n = n
-        self.mass = MASS
-        self.charge = CHARGE
+        # self.n = n
+        # self.mass = MASS
+        # self.charge = CHARGE
         self.fil = fil
         # distribution defaults
-        self.ke = source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy())
-        self.az = source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy())
-        self.el = source(str(EL_DIST_TYPE),n,dist_vals = EL_DIST_VALS.copy())
-        self.pos = source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())
+        # self.ke = source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy())
+        # self.az = source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy())
+        # self.el = source(str(EL_DIST_TYPE),n,dist_vals = EL_DIST_VALS.copy())
+        # self.pos = source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())
         self.df = pd.Series({'n':n,
                               'mass':MASS,
                               'charge':CHARGE,
@@ -435,3 +435,13 @@ class auto_parts:
                             (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
                              az[n],el[n],ke[n],1,1))
             f_count +=1
+
+    def splat_to_source(self,splat):
+        # function which takes the simPyon sim data frame and input df components to source 
+        # components, assumes cilidrical coords to r,phi,theta to y,az,el
+        inter_dist = {'ke':splat.df['ke'],
+         'az':splat.df['phi'],
+         'el':splat.df['theta'],
+         'pos':np.stack([splat.df['x'],splat.df['r']]).T}
+        for lab,val in inter_dist.items():
+            self.df[lab] = source('fixed_vector',dist_vals = {'vector':val})
