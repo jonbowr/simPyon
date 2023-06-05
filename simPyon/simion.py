@@ -65,7 +65,10 @@ class simion:
                  gemfil = '',recfil = '',
                  traj_recfil = '',
                  bench = '',
-                 pa = ''
+                 pa = '',
+                 obs_region = {'X_MAX':X_MAX,'X_MIN':X_MIN,
+                        'R_MAX':R_MAX,'R_MIN':R_MIN,
+                        'TOF_MEASURE':TOF_MEASURE}
                  ):
         self.commands = []
         self.home = home
@@ -82,7 +85,7 @@ class simion:
         self.traj_refil = traj_recfil
         self.trajectory_quality = 3
         self.scale_exclude = []
-
+        self.obs_region = obs_region
 
         if gemfil =='':
             self.gemfil = []
@@ -341,7 +344,8 @@ class simion:
                         trajectory_quality =self.trajectory_quality)
         data = str_data_scrape(outs,n_parts,cores,quiet)
         self.data = sim_data(data,symmetry = self.pa_info[0]['symmetry'],
-                                    mirroring = self.pa_info[0]['mirroring'])
+                                    mirroring = self.pa_info[0]['mirroring'],
+                                    obs = self.obs_region)
 
         if quiet == False:
             print(time.time() - start_time)
