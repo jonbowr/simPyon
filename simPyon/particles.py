@@ -437,11 +437,12 @@ class auto_parts:
             f_count +=1
 
     def splat_to_source(self,splat):
-        # function which takes the simPyon sim data frame and input df components to source 
+        # function which takes the simPyon.data.sim_data.df frame and input df components to source 
         # components, assumes cilidrical coords to r,phi,theta to y,az,el
-        inter_dist = {'ke':splat.df['ke'],
-         'az':splat.df['phi'],
-         'el':splat.df['theta'],
-         'pos':np.stack([splat.df['x'],splat.df['r']]).T}
+        inter_dist = {'ke':splat['ke'],
+         'az':splat['phi'],
+         'el':splat['theta'],
+         'pos':np.stack([splat['x'],splat['r']]).T}
         for lab,val in inter_dist.items():
             self.df[lab] = source('fixed_vector',dist_vals = {'vector':val})
+
