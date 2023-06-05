@@ -71,16 +71,9 @@ class sim_data:
                     if len(data)!=0:
                         starts = log_starts(self.df['ion n'])
                         stops = log_stops(self.df['ion n'])
-                        # print('stop_no: %d'%np.sum(stops))
 
-                        # print('start_no: %d'%np.sum(starts))
-                        # print('start_no: %d'%np.sum(starts[stops]))
                         starty = min(self.df['r'][starts])
 
-                        # self.df['counts'][starts] = self.df['r'][starts] / starty
-                        # self.df['counts'][starts] = self.df['counts'][starts] * \
-                        #     len(ax_base[starts]) /\
-                        #     np.sum(self.df['counts'][starts])
                         cts = self.df['r'][starts] / starty
                         self.df['counts'][starts] =  cts* len(ax_base[starts]) /\
                             np.sum(cts)
@@ -99,9 +92,6 @@ class sim_data:
     def __call__(self):
         return(self.df)
 
-    # def __len__(self):
-    #     return(len(list(self.df.values())[0]))
-
     def __iter__(self):
         return(iter(self.df.keys()))
 
@@ -110,15 +100,6 @@ class sim_data:
 
     def __setitem__(self,item,value):
         self.df[item] = value
-
-    # def __str__(self):
-    #     return(str(self.df))
-
-    # def __repr__(self):
-    #     return(pd.DataFrame(self.df))
-
-    # def _repr_pretty_(self, p, cycle):
-    #     return(pd.DataFrame(self.df)._repr_pretty_(p, cycle))
 
     def copy(self):
         return(sim_data(self))
@@ -151,21 +132,21 @@ class sim_data:
         stopz = log_stops(self.df['ion n'])
         return(self.mask(stopz))
 
-    def good(self):
+
+    def log_good(self):
         stops = log_stops(self.df['ion n'])
-        gx = np.logical_and(self.df[self.base_ax][stops] > self.obs['X_MIN'],
-                    self.df[self.base_ax][stops] < self.obs['X_MAX'])
-        gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
-                    self.df['r'][stops] > self.obs['R_MIN']) 
-        goot = np.logical_and(gx, gy)
+        goot = np.logical_and.reduce([
+                    self.df[self.base_ax][stops] > self.obs['X_MIN'],
+                    self.df[self.base_ax][stops] < self.obs['X_MAX'],
+                    self.df['r'][stops] < self.obs['R_MAX'],
+                    self.df['r'][stops] > self.obs['R_MIN']
+                    ])
 
         if self.obs['TOF_MEASURE'] == True:
+            # need to remove to generalize class
             r_max = 49
             r_min = 28
             L = 50.2
-            # r_max = 47
-            # r_min = 31.5
-            # L=27.5
             
             yf = self.df['y'][stops]+\
                 L*self.df['vy'][stops]/self.df['vx'][stops]
@@ -173,16 +154,6 @@ class sim_data:
             zf = self.df['z'][stops]+\
                 L*self.df['vz'][stops]/self.df['vx'][stops]
             rf = np.sqrt(zf**2+yf**2)
-            # r_fin = self.df['r'][stops] +\
-            #          L*np.sin(self.df['theta'][stops]*np.pi/180)*\
-            #          np.cos(self.df['phi'][stops]*np.pi/180)
-            # plt.figure()
-            # plt.plot()
-            # theta_max = np.arctan2(r_max - self.df['r'][stops],L)*180/np.pi
-            # theta_min = np.arctan2(r_min - self.df['r'][stops],L)*180/np.pi
-            # g_theta = np.logical_and(self.df['theta'][stops] < theta_max,
-            #                          self.df['theta'][stops] > theta_min)
-
             g_theta = np.logical_and(rf < r_max,
                                      rf > r_min)
             goot = np.logical_and(goot,g_theta)
@@ -190,20 +161,13 @@ class sim_data:
         good_ions = np.in1d(
             self.df['ion n'], self.df['ion n'][
                 log_starts(self.df['ion n'])][goot])
-        return(self.mask(good_ions))
+        return(good_ions)
+
+    def good(self):
+        return(self.mask(self.log_good()))
 
     def not_good(self):
-        stops = log_stops(self.df['ion n'])
-        gx = np.logical_and(self.df[self.base_ax][stops] > self.obs['X_MIN'],
-                    self.df[self.base_ax][stops] < self.obs['X_MAX'])
-        gy = np.logical_and(self.df['r'][stops] < self.obs['R_MAX'],
-                    self.df['r'][stops] > self.obs['R_MIN']) 
-        goot = np.logical_and(gx, gy)
-
-        good_ions = np.in1d(
-            self.df['ion n'], self.df['ion n'][
-                log_starts(self.df['ion n'])][goot])
-        return(self.mask(~good_ions))
+        return(self.mask(~self.log_good()))
 
     def show(self,hist_bins = 50,variables = ['tof','ke','x','r','theta','phi']):
         fig, axs = plt.subplots(int(np.ceil(len(variables)/2)),2)
