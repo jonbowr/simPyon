@@ -349,6 +349,7 @@ class source:
 class auto_parts:
     
     def __init__(self, fil='auto_ion.ion', n=10000):
+        import pandas as pd
         self.n = n
         self.mass = MASS
         self.charge = CHARGE
@@ -356,14 +357,14 @@ class auto_parts:
         # distribution defaults
         self.ke = source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy())
         self.az = source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy())
-        self.el = source(str(EL_DIST_TYPE),n,dist_val = EL_DIST_VALS.copy())
+        self.el = source(str(EL_DIST_TYPE),n,dist_vals = EL_DIST_VALS.copy())
         self.pos = source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())
         self.df = pd.Series({'n':n,
                               'mass':MASS,
-                              'charge':Charge,
+                              'charge':CHARGE,
                               'ke':source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy()),
                               'az':source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy()),
-                              'el':source(str(EL_DIST_TYPE),n,dist_val = EL_DIST_VALS.copy()),
+                              'el':source(str(EL_DIST_TYPE),n,dist_vals = EL_DIST_VALS.copy()),
                               'pos':source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())})
 
     def __getitem__(self,item):
