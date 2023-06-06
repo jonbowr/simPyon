@@ -3,81 +3,6 @@ from scipy import stats
 import math
 from ..defaults import *
 
-class sim_parts:
-
-    class dist:
-        def __init__(self, dist_type):
-            self.dist_type = dist_type
-            self.dist_vals = {}
-            if self.dist_type.lower() == 'gaussian':
-                self.dist_vals['mean'] = 0
-                self.dist_vals['fwhm'] = 1
-            if self.dist_type.lower() == 'uniform':
-                self.dist_vals['min'] = 0
-                self.dist_vals['max'] = 1
-            if self.dist_type.lower() == 'line':
-                self.dist_vals['first'] = np.array([0, 1, 0])
-                self.dist_vals['last'] = np.array([0, 1, 0])
-        
-        def dist_print(self):
-            dists = list(self.dist_vals.keys())
-            if self.dist_type is not 'line':
-                return('%s_distribution {%s = %f,%s = %f}'%(
-                        self.dist_type,
-                        dists[0],self.dist_vals[dists[0]],
-                        dists[1],self.dist_vals[dists[1]]))
-            else:
-                return('%s_distribution {'%self.dist_type+\
-                '%s = vector'%dists[0]+\
-                np.array2string(self.dist_vals[dists[0]],separator = ',').\
-                replace('[','(').replace(']',')')+','+\
-                '%s = vector'%dists[1]+\
-                np.array2string(self.dist_vals[dists[1]],separator = ',').\
-                replace('[','(').replace(']',')')+'}')
-
-    def __init__(self, fil='auto_fly_fil.fly2', n=10000, mass=1, charge=-1,
-                 ke_type='uniform', az_type='gaussian', el_type='gaussian',
-                 pos_type='line'):
-        self.n = n
-        self.mass = mass
-        self.charge = -1
-        self.fil = fil
-
-        # distribution defaults
-
-        self.ke = self.dist(ke_type)
-        self.ke.dist_vals['min'] = 0
-        self.ke.dist_vals['max'] = 1000
-
-        self.az = self.dist(az_type)
-        self.az.dist_vals['mean'] = 0
-        self.az.dist_vals['fwhm'] = 24
-        
-        self.el = self.dist(el_type)
-        self.el.dist_vals['mean'] = 150
-        self.el.dist_vals['fwhm' ] = 19.2
-
-        self.pos = self.dist(pos_type)
-        self.pos.dist_vals['first'] = np.array([99.4,133])
-        self.pos.dist_vals['last'] = np.array([158.9,116.8])
-
-    def fly_print(self):
-        lines = []
-        lines.append('particles {')
-        lines.append('coordinates = 0,')
-        lines.append('standard_beam {')
-        lines.append('n = %d,'%self.n)
-        lines.append('tob = 0,')
-        lines.append('mass = %d,'%self.mass)
-        lines.append('charge = %d,'%(self.charge))
-        lines.append('ke = %s,'%self.ke.dist_print())
-        lines.append('az = %s,'%self.az.dist_print())
-        lines.append('el = %s,'%self.el.dist_print())
-        lines.append('position = ' +self.pos.dist_print())
-        lines.append('}\n}')
-        with open(self.fil, 'w') as fil:
-             for line in lines: fil.write(line+'\n')
-
 
 def rand_line(v1,v2,size):
     d = v2 - v1
@@ -373,14 +298,14 @@ class auto_parts:
     def __setitem__(self,item,value):
         self.df[item] = value
 
-    def __call__(self):
-        return({'n':self.n,
-                  'mass':self.mass,
-                  'charge':self.charge,
-                  'ke':str(self.ke),
-                  'az':str(self.az),
-                  'el':str(self.el),
-                  'pos':str(self.pos)})
+    # def __call__(self):
+    #     return({'n':self.n,
+    #               'mass':self.mass,
+    #               'charge':self.charge,
+    #               'ke':str(self.ke),
+    #               'az':str(self.az),
+    #               'el':str(self.el),
+    #               'pos':str(self.pos)})
 
     def __str__(self):
         return(str({'n':self.n,
@@ -424,7 +349,7 @@ class auto_parts:
             fils = [self.fil]
         else: fils = self.fil
 
-        sub_num = int(self.n/len(fils))
+        sub_num = int(self.df['n']/len(fils))
         f_count = 0
         for f in fils:
             with open(f, 'w') as fil:
@@ -432,17 +357,16 @@ class auto_parts:
                     if np.sum(np.isnan(np.array([0,mass,charge,x[n],y[n],0,
                          az[n],el[n],ke[n],1,1])))==0:
                         fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                            (0,self.mass,self.charge,pos[n,0],pos[n,1],0,
+                            (0,mass,charge,pos[n,0],pos[n,1],0,
                              az[n],el[n],ke[n],1,1))
             f_count +=1
 
     def splat_to_source(self,splat):
         # function which takes the simPyon.data.sim_data.df frame and input df components to source 
         # components, assumes cilidrical coords to r,phi,theta to y,az,el
-        inter_dist = {'ke':splat['ke'],
-         'az':splat['phi'],
-         'el':splat['theta'],
-         'pos':np.stack([splat['x'],splat['r']]).T}
-        for lab,val in inter_dist.items():
-            self.df[lab] = source('fixed_vector',dist_vals = {'vector':val})
+        self.df['ke'] = source('fixed_vector',dist_vals = {'vector':splat['ke']})
+        self.df['az'] = source('fixed_vector',dist_vals = {'vector':splat['phi']})
+        self.df['el'] = source('fixed_vector',dist_vals = {'vector':splat['theta']})
+        self.df['pos'] = source('fixed_vector',dist_vals = {'vector':np.stack([splat['x'],splat['r']]).T})
+        self.df['n'] = len(splat['ke'])
 
