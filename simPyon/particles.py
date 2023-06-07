@@ -352,3 +352,8 @@ class auto_parts:
         self.df['n'] = len(splat['ke'])
         self.df['tof'] = source('fixed_vector',dist_vals = {'vector':splat['tof']})
 
+
+    def copy(self):
+        thing = auto_parts()
+        thing.df = self.df.copy()
+        return(thing)
