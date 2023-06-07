@@ -329,17 +329,25 @@ class auto_parts:
         if type(self.fil) == str:
             fils = [self.fil]
         else: fils = self.fil
-
         sub_num = int(self.df['n']/len(fils))
+
         f_count = 0
+        drop = 0
         for f in fils:
             with open(f, 'w') as fil:
-                for n in range(f_count*sub_num,(f_count+1)*sub_num):
+                n_start = f_count*sub_num
+                if f_count+1==len(fils):
+                    n_stop = len(x)
+                else: 
+                    n_stop = (f_count+1)*sub_num
+                for n in range(n_start,n_stop):
                     if np.sum(np.isnan(np.array([0,mass,charge,x[n],y[n],0,
                          az[n],el[n],ke[n],1,1])))==0:
                         fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
                             (tof[n],mass,charge,pos[n,0],pos[n,1],0,
                              az[n],el[n],ke[n],1,1))
+                    else:
+                        drop +=1
             f_count +=1
 
     def splat_to_source(self,splat):
@@ -351,7 +359,6 @@ class auto_parts:
         self.df['pos'] = source('fixed_vector',dist_vals = {'vector':np.stack([splat['x'],splat['r']]).T})
         self.df['n'] = len(splat['ke'])
         self.df['tof'] = source('fixed_vector',dist_vals = {'vector':splat['tof']})
-
 
     def copy(self):
         thing = auto_parts()

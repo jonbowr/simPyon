@@ -86,6 +86,7 @@ class simion:
         self.trajectory_quality = 3
         self.scale_exclude = []
         self.obs_region = obs_region
+        self.type = 'simion'
 
         if gemfil =='':
             self.gemfil = []
@@ -113,17 +114,8 @@ class simion:
             Warning("SimPyon updated to work best with default workbench file")
             self.bench = os.path.join(home,bench)
 
+        # Assign pa numbers associated with the number of gemfile electrodes
         self.pa = [os.path.join(home,'simPyon%d.pa'%pan) for pan in range(len(self.gemfil))]
-        # if not pa:
-        #     self.pa = []
-        #     for root,dirs,files in os.walk(home):
-        #         for file in files:
-        #             if file.endswith(".pa0"):
-        #                 self.pa.append(os.path.join(root,file).strip('0'))
-        # elif type(pa)== str:
-        #     self.pa = [os.path.join(home,pa)]
-        # elif type(pa) == list:
-        #     self.pa = [os.path.join(home,p) for p in pa]
 
         self.name = self.gemfil[0].upper().strip('.GEM')
         #scrape the gemfile for numbers
@@ -329,17 +321,18 @@ class simion:
         # Parse particle input type
         if type(parts) == int:
             n_parts = parts
-        elif type(parts) == auto_parts:
+        elif str(type(parts)) == str(auto_parts):
+            if quiet==False:
+                print('Flying Distribution:\n%s'%str(parts))
             self.source = auto_parts()
             self.source.df = parts.df.copy()
             n_parts = self.source['n']
-            if ~quiet:
-                print('Flying Distribution:\n%s'%str(parts))
         else:
+            if quiet==False:
+                print('Flying vector:\n%s'%str(parts))
             self.source.splat_to_source(parts)
             n_parts = self.source['n']
-            if ~quiet:
-                print('Flying vector:\n%s'%str(parts))
+
 
         start_time = time.time()
 
