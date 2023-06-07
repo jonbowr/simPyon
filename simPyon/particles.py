@@ -275,22 +275,16 @@ class auto_parts:
     
     def __init__(self, fil='auto_ion.ion', n=10000):
         import pandas as pd
-        # self.n = n
-        # self.mass = MASS
-        # self.charge = CHARGE
         self.fil = fil
         # distribution defaults
-        # self.ke = source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy())
-        # self.az = source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy())
-        # self.el = source(str(EL_DIST_TYPE),n,dist_vals = EL_DIST_VALS.copy())
-        # self.pos = source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())
         self.df = pd.Series({'n':n,
                               'mass':MASS,
                               'charge':CHARGE,
                               'ke':source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy()),
                               'az':source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy()),
                               'el':source(str(EL_DIST_TYPE),n,dist_vals = EL_DIST_VALS.copy()),
-                              'pos':source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy())})
+                              'pos':source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy()),
+                              'tof':source('single',n,dist_vals = {'value':0})})
 
     def __getitem__(self,item):
         return(self.df[item])
@@ -298,40 +292,26 @@ class auto_parts:
     def __setitem__(self,item,value):
         self.df[item] = value
 
-    # def __call__(self):
-    #     return({'n':self.n,
-    #               'mass':self.mass,
-    #               'charge':self.charge,
-    #               'ke':str(self.ke),
-    #               'az':str(self.az),
-    #               'el':str(self.el),
-    #               'pos':str(self.pos)})
-
     def __str__(self):
-        return(str({'n':self.n,
-                  'mass':self.mass,
-                  'charge':self.charge,
-                  'ke':str(self.ke),
-                  'az':str(self.az),
-                  'el':str(self.el),
-                  'pos':str(self.pos)}))
+        return(str(self.df))
 
     def sample(self):
-        for samp_dist in [self['ke'],self['az'],self['el'],self['pos']]:
+        for samp_dist in self[['ke','az','el','pos','tof']].values:
             if 'type' in samp_dist.dist_vals:
                 if samp_dist.dist_vals['type'] == 'parent':
                     distor = samp_dist(n = self['n'])
                     
-        for samp_dist in [self['ke'],self['az'],self['el'],self['pos']]:
+        for samp_dist in self[['ke','az','el','pos','tof']].values:
             if 'type' in samp_dist.dist_vals:
                 pass
             else:
                 samp_dist(n = self['n'])
         
-        for samp_dist in [self['ke'],self['az'],self['el'],self['pos']]:
+        for samp_dist in self[['ke','az','el','pos','tof']].values:
             if 'type' in samp_dist.dist_vals:
                 if samp_dist.dist_vals['type'] == 'child':
                     distor = samp_dist(n = self['n'])
+
     # Ion File output headder
     #time of birth,mass,charge,x0,y0,z0,azimuth, elevation, energy, cfw, color
     def ion_print(self):
@@ -342,6 +322,7 @@ class auto_parts:
         pos = self['pos'].dist_out
         charge = self['charge']
         mass = self['mass']
+        tof = self['tof'].dist_out
         x = pos[:,0]
         y = pos[:,1]
 
@@ -357,7 +338,7 @@ class auto_parts:
                     if np.sum(np.isnan(np.array([0,mass,charge,x[n],y[n],0,
                          az[n],el[n],ke[n],1,1])))==0:
                         fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                            (0,mass,charge,pos[n,0],pos[n,1],0,
+                            (tof[n],mass,charge,pos[n,0],pos[n,1],0,
                              az[n],el[n],ke[n],1,1))
             f_count +=1
 
@@ -369,4 +350,5 @@ class auto_parts:
         self.df['el'] = source('fixed_vector',dist_vals = {'vector':splat['theta']})
         self.df['pos'] = source('fixed_vector',dist_vals = {'vector':np.stack([splat['x'],splat['r']]).T})
         self.df['n'] = len(splat['ke'])
+        self.df['tof'] = source('fixed_vector',dist_vals = {'vector':splat['tof']})
 
