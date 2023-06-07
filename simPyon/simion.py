@@ -333,11 +333,13 @@ class simion:
             self.source = auto_parts()
             self.source.df = parts.df.copy()
             n_parts = self.source['n']
-            print('Flying Distribution:\n%s'%str(parts))
+            if ~quiet:
+                print('Flying Distribution:\n%s'%str(parts))
         else:
             self.source.splat_to_source(parts)
             n_parts = self.source['n']
-            print('Flying vector:\n%s'%str(parts))
+            if ~quiet:
+                print('Flying vector:\n%s'%str(parts))
 
         start_time = time.time()
 
