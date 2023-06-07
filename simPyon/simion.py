@@ -949,7 +949,7 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
         pt = os.path.join(sim.home,'auto_fly_%i.ion'%i)
         fly_fils.append(pt)
 
-    sim.source.n = n_parts
+    sim.source['n'] = n_parts
     sim.source.fil = fly_fils
     sim.source.ion_print()
 
