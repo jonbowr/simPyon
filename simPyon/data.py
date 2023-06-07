@@ -72,7 +72,7 @@ class sim_data:
                         self.df['counts'][starts] =  cts* len(ax_base[starts]) /\
                             np.sum(cts)
                         self.df['counts'][stops] = self.df['counts'][starts]
-                self.df = pd.DataFrame(self.df)
+                self.df = DataFrame(self.df)
 
         elif str(type(data)) == str(type(self)):
             self.header = list(data.df.keys())
@@ -120,6 +120,11 @@ class sim_data:
         cop.df = cop.df.iloc[mask]
         # for nam in cop:
             # cop[nam] = cop[nam][mask]
+        return(cop)
+
+    def drop(self,nam,axis = 1):
+        cop = sim_data(self)
+        cop.df = cop.df.drop(nam,axis = axis)
         return(cop)
 
     def throughput(self):
