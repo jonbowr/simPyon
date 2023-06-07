@@ -292,7 +292,7 @@ class simion:
             self.volt_dict = dict_out
         return(self)  
 
-    def fly(self,n_parts = 1000,cores = multiprocessing.cpu_count(),
+    def fly(self,parts = 1000,cores = multiprocessing.cpu_count(),
             quiet = True):
         '''
         Fly n_parts particles using the particle probability distributions defined in self.source. 
@@ -326,13 +326,20 @@ class simion:
             with open(self.bench.replace('iob','lua'),'w') as fil:
                 fil.write(self.usr_prgm)
 
-
-        # if type(n_parts) == sim_data:
-        #     for 
-        #     self.source.df
+        # Parse particle input type
+        if type(parts) == int:
+            n_parts = parts
+        elif type(parts) == auto_parts:
+            self.source = auto_parts()
+            self.source.df = parts.df.copy()
+            n_parts = self.source['n']
+            print('Flying Distribution:\n%s'%str(parts))
+        else:
+            self.source.splat_to_source(parts)
+            n_parts = self.source['n']
+            print('Flying vector:\n%s'%str(parts))
 
         start_time = time.time()
-
 
         if quiet == False:
             print(' ===============================================')
@@ -346,11 +353,10 @@ class simion:
         self.data = sim_data(data,symmetry = self.pa_info[0]['symmetry'],
                                     mirroring = self.pa_info[0]['mirroring'],
                                     obs = self.obs_region)
-
         if quiet == False:
             print(time.time() - start_time)
 
-        return(self)
+        return(self.data)
 
     def fly_trajectory(self,n_parts = 100,cores = multiprocessing.cpu_count(),
                       quiet = True, dat_step = 30,show= True,

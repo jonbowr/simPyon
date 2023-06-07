@@ -4,19 +4,15 @@ from scipy import stats
 import math
 from matplotlib import pyplot as plt
 from ..defaults import *
-import pandas as pd
+from pandas import DataFrame
 
 def log_starts(ion_num):
     start_loc = np.ones(len(ion_num)).astype(bool)
     start_loc[1:] = (ion_num[1:] - ion_num[:-1]).astype(bool)
     return(start_loc)
 
-
 def log_stops(ion_num):
-    start_loc = np.ones(len(ion_num)).astype(bool)
-    start_loc[:-1] = (ion_num[:-1] - ion_num[1:]).astype(bool)
-    return(start_loc)
-
+    return(~log_starts(ion_num))
 
 class sim_data:
 
@@ -71,19 +67,21 @@ class sim_data:
                     if len(data)!=0:
                         starts = log_starts(self.df['ion n'])
                         stops = log_stops(self.df['ion n'])
-
                         starty = min(self.df['r'][starts])
-
                         cts = self.df['r'][starts] / starty
                         self.df['counts'][starts] =  cts* len(ax_base[starts]) /\
                             np.sum(cts)
                         self.df['counts'][stops] = self.df['counts'][starts]
+                self.df = pd.DataFrame(self.df)
 
         elif str(type(data)) == str(type(self)):
             self.header = list(data.df.keys())
-            self.df = {}
-            for head, arr in data.df.items():
-                self.df[head.lower()] = arr
+            if type(data)==dict:
+                self.df = {}
+                for head, arr in data.df.items():
+                    self.df[head.lower()] = arr
+            else:
+                self.df = data.df.copy()
             self.symmetry = data.symmetry
             self.mirror_ax = data.mirror_ax
             self.base_ax = data.base_ax
@@ -96,7 +94,10 @@ class sim_data:
         return(iter(self.df.keys()))
 
     def __getitem__(self,item):
-        return(self.df[item])
+        if type(self.df)==DataFrame:
+            return(self.df[item].values)
+        elif type(self.df)==dict:
+            return(self.df[item])
 
     def __setitem__(self,item,value):
         self.df[item] = value
@@ -116,8 +117,9 @@ class sim_data:
 
     def mask(self,mask):
         cop = sim_data(self)
-        for nam in cop:
-            cop[nam] = cop[nam][mask]
+        cop.df = cop.df.iloc[mask]
+        # for nam in cop:
+            # cop[nam] = cop[nam][mask]
         return(cop)
 
     def throughput(self):
@@ -125,21 +127,20 @@ class sim_data:
             np.sum(self.start().df['counts']))
 
     def start(self):
-        startz = log_starts(self.df['ion n'])
+        startz = log_starts(self['ion n'])
         return(self.mask(startz))
 
     def stop(self):
-        stopz = log_stops(self.df['ion n'])
+        stopz = log_stops(self['ion n'])
         return(self.mask(stopz))
 
-
     def log_good(self):
-        stops = log_stops(self.df['ion n'])
+        stops = log_stops(self['ion n'])
         goot = np.logical_and.reduce([
-                    self.df[self.base_ax][stops] > self.obs['X_MIN'],
-                    self.df[self.base_ax][stops] < self.obs['X_MAX'],
-                    self.df['r'][stops] < self.obs['R_MAX'],
-                    self.df['r'][stops] > self.obs['R_MIN']
+                    self[self.base_ax][stops] > self.obs['X_MIN'],
+                    self[self.base_ax][stops] < self.obs['X_MAX'],
+                    self['r'][stops] < self.obs['R_MAX'],
+                    self['r'][stops] > self.obs['R_MIN']
                     ])
 
         if self.obs['TOF_MEASURE'] == True:
@@ -148,19 +149,19 @@ class sim_data:
             r_min = 28
             L = 50.2
             
-            yf = self.df['y'][stops]+\
-                L*self.df['vy'][stops]/self.df['vx'][stops]
+            yf = self['y'][stops]+\
+                L*self['vy'][stops]/self['vx'][stops]
 
-            zf = self.df['z'][stops]+\
-                L*self.df['vz'][stops]/self.df['vx'][stops]
+            zf = self['z'][stops]+\
+                L*self['vz'][stops]/self['vx'][stops]
             rf = np.sqrt(zf**2+yf**2)
             g_theta = np.logical_and(rf < r_max,
                                      rf > r_min)
             goot = np.logical_and(goot,g_theta)
             self.rf = rf[goot]
         good_ions = np.in1d(
-            self.df['ion n'], self.df['ion n'][
-                log_starts(self.df['ion n'])][goot])
+            self['ion n'], self['ion n'][
+                log_starts(self['ion n'])][goot])
         return(good_ions)
 
     def good(self):
