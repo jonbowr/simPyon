@@ -68,7 +68,8 @@ class simion:
                  pa = '',
                  obs_region = {'X_MAX':X_MAX,'X_MIN':X_MIN,
                         'R_MAX':R_MAX,'R_MIN':R_MIN,
-                        'TOF_MEASURE':TOF_MEASURE}
+                        'TOF_MEASURE':TOF_MEASURE,
+                        'R_WEIGHT':R_WEIGHT}
                  ):
         self.commands = []
         self.home = home

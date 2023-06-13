@@ -23,7 +23,8 @@ class sim_data:
                  mirroring='y',
                  obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
                         'R_MAX':R_MAX,'R_MIN':R_MIN,
-                        'TOF_MEASURE':TOF_MEASURE}):
+                        'TOF_MEASURE':TOF_MEASURE,
+                        'R_WEIGHT':R_WEIGHT}):
 
         if type(data) is np.ndarray:
             self.header = headder
@@ -62,7 +63,7 @@ class sim_data:
                 self.df['phi'] = np.arctan2(vtheta,vbase)*180/np.pi
 
                 # fix the count rate for increase in CS counts with radius
-                if R_WEIGHT == True:
+                if obs['R_WEIGHT'] == True:
                     self.df['counts'] = np.zeros(len(ax_base))
                     if len(data)!=0:
                         starts = log_starts(self.df['ion n'])
@@ -132,20 +133,19 @@ class sim_data:
 
     def append_col(self,data,name='',stage = 'both',
                             inplace = True,fill_val = np.nan):
-        if type(data) == pd.series:
-            name = data.name
+        # if type(data) == pd.series:
+        #     name = data.name
         if inplace:
             self.df[name] = np.ones(len(self.df))*fill_val
-            starts = log_starts(self.df['ion n'])
-            stops = log_stops(self.df['ion n'])
+            starts = log_starts(self['ion n'])
+            stops = log_stops(self['ion n'])
             if stage == 'start':
-                self.df[name][starts] = data
-                self.df[name][stops] = data
+                self[name][starts] = data
             elif stage == 'stop':
-                self.df[name][stops] = data
+                self[name][stops] = data
             elif stage == 'both':
-                self.df[name][starts] = data
-                self.df[name][stops] = data
+                self[name][starts] = data
+                self[name][stops] = data
         return(self)
 
     def throughput(self):
