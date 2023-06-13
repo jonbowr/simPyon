@@ -62,9 +62,9 @@ class sim_data:
                 self.df['theta'] = np.arctan2(vr,np.sqrt(vbase**2+self.df['vtheta']**2))*180/np.pi
                 self.df['phi'] = np.arctan2(vtheta,vbase)*180/np.pi
 
+                self.df['counts'] = np.ones(len(ax_base))
                 # fix the count rate for increase in CS counts with radius
                 if obs['R_WEIGHT'] == True:
-                    self.df['counts'] = np.zeros(len(ax_base))
                     if len(data)!=0:
                         starts = log_starts(self.df['ion n'])
                         stops = log_stops(self.df['ion n'])
@@ -74,6 +74,7 @@ class sim_data:
                             np.sum(cts)
                         self.df['counts'][stops] = self.df['counts'][starts]
                 self.df = DataFrame(self.df)
+                self.df['is_start'] = log_starts(self['ion n'])
 
         elif str(type(data)) == str(type(self)):
             self.header = list(data.df.keys())
@@ -137,8 +138,8 @@ class sim_data:
         #     name = data.name
         if inplace:
             self.df[name] = np.ones(len(self.df))*fill_val
-            starts = log_starts(self['ion n'])
-            stops = log_stops(self['ion n'])
+            starts = self['is_start']
+            stops = ~self['is_start']
             if stage == 'start':
                 self[name][starts] = data
             elif stage == 'stop':

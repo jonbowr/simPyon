@@ -285,8 +285,9 @@ class simion:
             self.volt_dict = dict_out
         return(self)  
 
-    def fly(self,parts = 1000,cores = multiprocessing.cpu_count(),
-            quiet = True):
+    def fly(self,parts = 1000,
+                    cores = multiprocessing.cpu_count(),
+                    quiet = True):
         '''
         Fly n_parts particles using the particle probability distributions defined in self.source. 
         Parallelizes the fly processes by spawing a number of instances associated with the
