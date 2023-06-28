@@ -126,8 +126,7 @@ class source:
         fnc = pdf('cos')
         fnc.kwargs['x_min'] = self.dist_vals['x_min']
         return((fnc.sample(n,self['a']/self['range'],
-                                  self['b']/self['range'])*self.dist_vals['range']\
-            -self.dist_vals['range']/2)+self.dist_vals['mean'])
+                                  self['b']/self['range'])-.5)*self.dist_vals['range']+self.dist_vals['mean'])
 
     def sample_vector(self,n):
         self.dist_vals['index'] = np.random.choice(len(self.dist_vals['vector']),n)
@@ -185,6 +184,10 @@ class source:
 
     def pdf(self,n):
         return(self.dist_vals['f'].sample(n,a = self.dist_vals['a'],b = self.dist_vals['b']))
+
+    def poisson(self,n):
+        return((pdf('poisson',{lab:self.dist_vals[lab] for lab in ['c','b','k']}).sample(\
+                        n,self['a1'],self['b1'])-self['b'])*self['fwhm']*self['direction']+self['mean'])
     
     def __init__(self,dist_type='',n=1,dist_vals = {}):
 
@@ -204,7 +207,8 @@ class source:
                 'circle_pos':self.circle_pos,
                 'dependent_func':self.dependent_func,
                 'pdf':self.pdf,
-                'new':None}
+                'new':None,
+                'poisson':self.poisson}
 
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
@@ -235,7 +239,15 @@ class source:
                                 'type':'child',
                                 'parent':None},
                 'pdf':{'f':[],'a':0,'b':1},
-                'new':{}
+                'new':{},
+                'poisson':{'a1':0,'b1':4,
+                                'c':0,
+                                'b':.155,
+                                'k':1,
+                                'fwhm':50,
+                                'mean':100,
+                                'direction':-1}
+
                 }
 
         self.defaults = func_defaults
@@ -256,9 +268,9 @@ class source:
         self.n = n
 
     def __call__(self,n = []):
-        if n != []:
-            self.n = n
-        self.dist_out = self.f(self.n)
+        # if n != []:
+        #     self.n = n
+        self.dist_out = self.f(n)
         # self.dist_out[np.isnan(self.dist_out)] = -999999999
         return(self.dist_out)
 
