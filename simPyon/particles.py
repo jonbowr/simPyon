@@ -281,7 +281,7 @@ class source:
         return(self.dist_out)
 
     def __str__(self):
-        return('simPyon.particles.source:\n\t%s'%str([self.dist_type,self.dist_vals]))
+        return('simPyon.particles.source: %s'%str([self.dist_type,self.dist_vals]))
 
     def __repr__(self):
         return('%s\n%s'%(str(type(self)),str(self)))
@@ -306,7 +306,8 @@ class auto_parts:
                               'el':source(str(EL_DIST_TYPE),n=n,dist_vals = EL_DIST_VALS.copy()),
                               'pos':source(str(POS_DIST_TYPE),n=n,dist_vals = POS_DIST_VALS.copy()),
                               'tof':source('single',n=n,dist_vals = {'value':0})})
-
+        self.params = {lab:(n.dist_vals if type(n)==source) for lab,n in self.df.items()  }
+    
     def __getitem__(self,item):
         return(self.df[item])
 
@@ -314,7 +315,11 @@ class auto_parts:
         self.df[item] = value
 
     def __str__(self):
-        return(str(self.df))
+        return('%s\n   '%str(type(self))+
+               '   '.join(['%s: %s\n'%(lab,str(val))for lab,val in self.df.items()]))
+
+    def __repr__(self):
+        return(str(self))
 
     def sample(self):
         for samp_dist in self[['ke','az','el','pos','tof']].values:

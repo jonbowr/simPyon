@@ -137,13 +137,13 @@ class simion:
                 self.usr_prgm+='end \n'
                 
         self.geo = geo(self.gemfil)
+        self.params = {'volts':self.volt_dict}
 
 
     def __repr__(self):
         return('%s \n'%str(type(self))+
-                'Workbench:%s \n'%self.bench +
-                'Gemfile: %s \n'%self.gemfil+
-                'Pa: %s \n'%self.pa)
+                '   Workbench:%s \n'%self.bench +
+                '   Gemfile: %s \n'%','.join([os.path.basename(g) for g in self.gemfil]))
         
 
     def gem2pa(self,gemfil = [], pa = None,pa_tag = '#'):
