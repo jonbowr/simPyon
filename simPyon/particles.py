@@ -79,6 +79,12 @@ class pdf:
         for t in kwargs:
             self.kwargs[t] = kwargs[t]
 
+    def __str__(self):
+        return('simPyon.particles.pdf:\n\t%s\n\tKwargs:%s'%(str(self.f),str(self.kwargs)))
+
+    def __repr__(self):
+        return(str(self))
+
     def __call__(self,x):
         return(self.f(x,**self.kwargs))
 
@@ -189,7 +195,7 @@ class source:
         return((pdf('poisson',{lab:self.dist_vals[lab] for lab in ['c','b','k']}).sample(\
                         n,self['a1'],self['b1'])-self['b'])*self['fwhm']*self['direction']+self['mean'])
     
-    def __init__(self,dist_type='',n=1,dist_vals = {}):
+    def __init__(self,dist_type='',dist_vals = {},n=1):
 
         func_dict = {'gaussian':self.gaussian,
                 'uniform':self.uniform,
@@ -275,7 +281,10 @@ class source:
         return(self.dist_out)
 
     def __str__(self):
-        return(str([self.dist_type,self.dist_vals]))
+        return('simPyon.particles.source:\n\t%s'%str([self.dist_type,self.dist_vals]))
+
+    def __repr__(self):
+        return('%s\n%s'%(str(type(self)),str(self)))
 
     def __getitem__(self,item):
         return(self.dist_vals[item])
@@ -292,11 +301,11 @@ class auto_parts:
         self.df = pd.Series({'n':n,
                               'mass':MASS,
                               'charge':CHARGE,
-                              'ke':source(str(KE_DIST_TYPE),n,dist_vals =KE_DIST_VALS.copy()),
-                              'az':source(str(AZ_DIST_TYPE),n,dist_vals = AZ_DIST_VALS.copy()),
-                              'el':source(str(EL_DIST_TYPE),n,dist_vals = EL_DIST_VALS.copy()),
-                              'pos':source(str(POS_DIST_TYPE),n,dist_vals = POS_DIST_VALS.copy()),
-                              'tof':source('single',n,dist_vals = {'value':0})})
+                              'ke':source(str(KE_DIST_TYPE),n=n,dist_vals =KE_DIST_VALS.copy()),
+                              'az':source(str(AZ_DIST_TYPE),n=n,dist_vals = AZ_DIST_VALS.copy()),
+                              'el':source(str(EL_DIST_TYPE),n=n,dist_vals = EL_DIST_VALS.copy()),
+                              'pos':source(str(POS_DIST_TYPE),n=n,dist_vals = POS_DIST_VALS.copy()),
+                              'tof':source('single',n=n,dist_vals = {'value':0})})
 
     def __getitem__(self,item):
         return(self.df[item])
