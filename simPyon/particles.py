@@ -306,7 +306,7 @@ class auto_parts:
                               'el':source(str(EL_DIST_TYPE),n=n,dist_vals = EL_DIST_VALS.copy()),
                               'pos':source(str(POS_DIST_TYPE),n=n,dist_vals = POS_DIST_VALS.copy()),
                               'tof':source('single',n=n,dist_vals = {'value':0})})
-        self.params = {lab:(n.dist_vals if type(n)==source) for lab,n in self.df.items()  }
+        self.params = {lab:n.dist_vals for lab,n in self.df.items() if type(n)==source}
     
     def __getitem__(self,item):
         return(self.df[item])
