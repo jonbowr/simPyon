@@ -256,7 +256,7 @@ class source:
 
                 }
 
-        self.defaults = func_defaults
+        self.defaults = dict(func_defaults)
         # if type(dist_type) == str:
         if dist_type == '':
             dist_type = 'uniform'

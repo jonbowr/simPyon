@@ -100,8 +100,15 @@ class sim_data:
             return(self.df[item].values)
         elif type(self.df)==dict:
             return(self.df[item])
+
+    def __str__(self):
+        return(repr(self))
+
+
     def __repr__(self):
-        return(str(self))
+        return(str(type(self))+
+               '\n Size:%s'%str(self.df.shape)+
+               '\n Obs Region %s'%str(self.obs))
 
     def __setitem__(self,item,value):
         self.df[item] = value
