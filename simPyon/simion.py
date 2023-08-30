@@ -758,19 +758,19 @@ class simion:
     def calc_pe(self,mm_pt=10,x_rng = None,y_rng = None,param = 'v',
                         cores = multiprocessing.cpu_count()):
         from .particles import source
+        import pandas as pd
 
         usr_prgm_add = self.usr_prgm+'simion.workbench_program()\n adjustable max_time = 0   -- microseconds\n'+\
                       'function segment.other_actions()\n if ion_time_of_flight >= max_time then\n'+\
                         'ion_splat = -1 \n end\n end'
 
+        tot_pa = pd.DataFrame(self.pa_info)
         if not x_rng:
-            verts = np.concatenate(self.geo.get_x())
-            x_rng = [min(verts),max(verts)]
-
+            x_rng = [0,max(tot_pa['Lx']*tot_pa['pxls_mm'])]
         if not y_rng:
-            verts = np.concatenate(self.geo.get_y())
-            y_rng = [min(verts),max(verts)]
-        
+            y_rng = [0,max(tot_pa['Ly']*tot_pa['pxls_mm'])]
+
+
         x = np.linspace(x_rng[0],x_rng[1],int((x_rng[1]-x_rng[0])/mm_pt))
         y = np.linspace(y_rng[0],y_rng[1],int((y_rng[1]-y_rng[0])/mm_pt))
         xx,yy = np.meshgrid(x,y)
@@ -789,9 +789,9 @@ class simion:
         # p_source.splat_to_source(prts)
         # return(p_source)
         p_source = auto_parts()
-        p_source.n = len(xy)
-        p_source.pos = source('fixed_vector',n = len(xy))
-        p_source.pos['vector'] = xy
+        p_source['n'] = len(xy)
+        p_source['pos'] = source('fixed_vector',n = len(xy))
+        p_source['pos']['vector'] = xy
         store_parts = self.source.copy()
 
         self.source = p_source
@@ -801,10 +801,10 @@ class simion:
                         os.path.join(self.home,'simPyon_pe.rec'))
         pe_head = ['Ion number','x','y','z','v','grad v','B']
 
-        dat = str_data_scrape(core_fly(self,len(xy),cores,quiet = False,
+        dat = str_data_scrape(core_fly(self,len(xy),cores,quiet = True,
                                         rec_fil = 'simPyon_pe.rec',
-                                        trajectory_quality=0),len(xy),cores,quiet = False,usr_prgm = usr_prgm_add)
-        # import pandas as pd
+                                        trajectory_quality=0,usr_prgm = usr_prgm_add),len(xy),cores,quiet = False)
+        # 
         # v_df = pd.DataFrame(dat,columns = pe_head).sort_values(by = 'Ion number')
         # v_full = np.zeros(len(xy))
         # v_full[dat[:,0].astype(int)-1] = dat[:,5]
@@ -824,7 +824,6 @@ class simion:
 
         self.v_data = v_dat
         self.source = store_parts
-        # return(v_dat)
 
     def show_pe(self,param = 'v',cmap = cm.jet,vmax = None,
                 vmin = None,imtype = 'both',levels = 10,
