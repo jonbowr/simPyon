@@ -128,13 +128,13 @@ class simion:
             self.pa_info.append(gem.get_pa_info(gm))
 
         pa = 1
-        for pai in self.pa_info:
-            if 'pa_offset_position' in pai:
-                self.usr_prgm+='\nfunction segment.initialize_run() \n'
-                for d,v in zip(['x','y','z'],pai['pa_offset_position']):
-                    self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
-                pa +=1
-                self.usr_prgm+='end \n'
+        # for pai in self.pa_info:
+        #     if 'pa_offset_position' in pai:
+        #         self.usr_prgm+='\nfunction segment.initialize_run() \n'
+        #         for d,v in zip(['x','y','z'],pai['pa_offset_position']):
+        #             self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
+        #         pa +=1
+        #         self.usr_prgm+='end \n'
                 
         self.geo = geo(self.gemfil)
         self.params = {'volts':self.volt_dict}
@@ -763,6 +763,7 @@ class simion:
             fil.write('simion.workbench_program()\n adjustable max_time = 0   -- microseconds\n'+
                       'function segment.other_actions()\n if ion_time_of_flight >= max_time then\n'+
                         'ion_splat = -1 \n end\n end')
+            fil.close()
 
         if not x_rng:
             verts = np.concatenate(self.geo.get_x())
@@ -776,38 +777,52 @@ class simion:
         y = np.linspace(y_rng[0],y_rng[1],int((y_rng[1]-y_rng[0])/mm_pt))
         xx,yy = np.meshgrid(x,y)
         xy = np.stack([xx.flatten(),yy.flatten()]).T
+        print(xy.shape)
 
+        prts = {}
+        prts['x'] = xy[:,0]
+        prts['r'] = xy[:,1]
+        for l in ['ke','theta','phi','tof']:
+            prts[l] = np.zeros(len(xy))
+        # prts['tof'] = np.ones(len(xy))
+
+        # p_source = auto_parts()
+        # p_source['charge'] = 0
+        # p_source.splat_to_source(prts)
+        # return(p_source)
         p_source = auto_parts()
         p_source.n = len(xy)
-
-        p_source.pos = source('fixed_vector',len(xy))
+        p_source.pos = source('fixed_vector',n = len(xy))
         p_source.pos['vector'] = xy
-
-        store_parts = self.source
+        store_parts = self.source.copy()
 
         self.source = p_source
 
-
         copy("%s/rec/simPyon_pe.rec"%\
                         os.path.dirname(os.path.dirname(__file__)+'..'),
-                        self.home+'simPyon_pe.rec')
+                        os.path.join(self.home,'simPyon_pe.rec'))
+        pe_head = ['Ion number','x','y','z','v','grad v','B']
 
         dat = str_data_scrape(core_fly(self,len(xy),cores,quiet = False,
-                                        rec_fil = self.home+'simPyon_pe.rec',
+                                        rec_fil = 'simPyon_pe.rec',
                                         trajectory_quality=0),len(xy),cores,quiet = False)
+        # import pandas as pd
+        # v_df = pd.DataFrame(dat,columns = pe_head).sort_values(by = 'Ion number')
         # v_full = np.zeros(len(xy))
         # v_full[dat[:,0].astype(int)-1] = dat[:,5]
 
-        v_full = np.zeros((len(xy),3))*np.nan
-        v_full[dat[:,0].astype(int)-1] = dat[:,4:]
+        v_full = np.zeros((len(xy),6))*np.nan
+        v_full[dat[:,0].astype(int)-1] = dat[:,1:]
 
         v_dat = {}
         v_dat['x'] = x
         v_dat['y'] = y
         v_dat['xy'] = xy
-        v_dat['v'] = v_full[:,0]
-        v_dat['grad v'] = v_full[:,1]
-        v_dat['B'] = v_full[:,2]
+        v_dat['xx'] = v_full[:,0]
+        v_dat['yy'] = v_full[:,1]
+        v_dat['v'] = v_full[:,3]
+        v_dat['grad v'] = v_full[:,4]
+        v_dat['B'] = v_full[:,5]
 
         self.v_data = v_dat
         self.source = store_parts
@@ -962,8 +977,9 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
         loc_com+=r" --trajectory-quality=%d"%trajectory_quality
         if markers !=0:
             loc_com+=r" --markers=%d"%markers
-        loc_com+=r" --recording=%s"%(sim.recfil if rec_fil == '' else rec_fil)
-        loc_com += r" --particles=%s"%ion_fil
+        # use basename assuming everything is put correctly into home directory
+        loc_com+=r" --recording=%s"%os.path.basename(sim.recfil if rec_fil == '' else rec_fil)
+        loc_com += r" --particles=%s"%os.path.basename(ion_fil)
         loc_com += r" %s"%sim.bench
         sim.commands = loc_com
         f = tmp.TemporaryFile()
