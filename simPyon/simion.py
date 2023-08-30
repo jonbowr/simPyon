@@ -128,13 +128,13 @@ class simion:
             self.pa_info.append(gem.get_pa_info(gm))
 
         pa = 1
-        # for pai in self.pa_info:
-        #     if 'pa_offset_position' in pai:
-        #         self.usr_prgm+='\nfunction segment.initialize_run() \n'
-        #         for d,v in zip(['x','y','z'],pai['pa_offset_position']):
-        #             self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
-        #         pa +=1
-        #         self.usr_prgm+='end \n'
+        for pai in self.pa_info:
+            if 'pa_offset_position' in pai:
+                self.usr_prgm+='\nfunction segment.load() \n'
+                for d,v in zip(['x','y','z'],pai['pa_offset_position']):
+                    self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
+                self.usr_prgm+='end \n'
+            pa +=1
                 
         self.geo = geo(self.gemfil)
         self.params = {'volts':self.volt_dict}
@@ -316,9 +316,9 @@ class simion:
                             self.recfil)
 
         # Write the workbench program in 'usr_prgm'
-        if self.bench:
-            with open(self.bench.replace('iob','lua'),'w') as fil:
-                fil.write(self.usr_prgm)
+        # if self.bench:
+        #     with open(self.bench.replace('iob','lua'),'w') as fil:
+        #         fil.write(self.usr_prgm)
 
         # Parse particle input type
         if type(parts) == int:
@@ -389,9 +389,9 @@ class simion:
             # os.remove(self.home+'simPyon_traj.rec')
 
         # Write the workbench program in 'usr_prgm'
-        if self.bench:
-            with open(self.bench.replace('iob','lua'),'w') as fil:
-                fil.write(self.usr_prgm)
+        # if self.bench:
+        #     with open(self.bench.replace('iob','lua'),'w') as fil:
+        #         fil.write(self.usr_prgm)
 
         start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
@@ -468,9 +468,9 @@ class simion:
             # os.remove(self.home+'simPyon_traj.rec')
 
         # Write the workbench program in 'usr_prgm'
-        if self.bench:
-            with open(self.bench.replace('iob','lua'),'w') as fil:
-                fil.write(self.usr_prgm)
+        # if self.bench:
+        #     with open(self.bench.replace('iob','lua'),'w') as fil:
+        #         fil.write(self.usr_prgm)
 
         start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
@@ -759,11 +759,9 @@ class simion:
                         cores = multiprocessing.cpu_count()):
         from .particles import source
 
-        with open(self.bench.replace('iob','lua'),'w') as fil:
-            fil.write('simion.workbench_program()\n adjustable max_time = 0   -- microseconds\n'+
-                      'function segment.other_actions()\n if ion_time_of_flight >= max_time then\n'+
-                        'ion_splat = -1 \n end\n end')
-            fil.close()
+        usr_prgm_add = self.usr_prgm+'simion.workbench_program()\n adjustable max_time = 0   -- microseconds\n'+\
+                      'function segment.other_actions()\n if ion_time_of_flight >= max_time then\n'+\
+                        'ion_splat = -1 \n end\n end'
 
         if not x_rng:
             verts = np.concatenate(self.geo.get_x())
@@ -805,7 +803,7 @@ class simion:
 
         dat = str_data_scrape(core_fly(self,len(xy),cores,quiet = False,
                                         rec_fil = 'simPyon_pe.rec',
-                                        trajectory_quality=0),len(xy),cores,quiet = False)
+                                        trajectory_quality=0),len(xy),cores,quiet = False,usr_prgm = usr_prgm_add)
         # import pandas as pd
         # v_df = pd.DataFrame(dat,columns = pe_head).sort_values(by = 'Ion number')
         # v_full = np.zeros(len(xy))
@@ -960,9 +958,18 @@ def str_data_scrape(outs,n_parts,cores,quiet):
     data = np.stack(tot_lines)
     return(data)
 
-def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality = 3):
+def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality = 3,usr_prgm = ''):
     checks = []
     fly_fils = []
+
+    if sim.bench:
+        with open(sim.bench.replace('iob','lua'),'w') as fil:
+            if usr_prgm == '':
+                fil.write(sim.usr_prgm)
+            else:
+                fil.write(usr_prgm)
+            fil.close()
+
     for i in range(int(cores)):
         pt = os.path.join(sim.home,'auto_fly_%i.ion'%i)
         fly_fils.append(pt)
