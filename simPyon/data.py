@@ -104,7 +104,6 @@ class sim_data:
     def __str__(self):
         return(repr(self))
 
-
     def __repr__(self):
         return(str(type(self))+
                '\n Size:%s'%str(self.df.shape)+
@@ -158,9 +157,13 @@ class sim_data:
                 self[name][stops] = data
         return(self)
 
-    def throughput(self):
-        return(np.sum(self.good().start().df['counts'])/\
-            np.sum(self.start().df['counts']))
+    def throughput(self,weights = True):
+        if weights:
+            return(np.sum(self.good().start().df['counts'])/\
+                np.sum(self.start().df['counts']))
+        else:
+            return(len(self.good().start())/\
+                    len(self.start()))
 
     def start(self):
         startz = log_starts(self['ion n'])
