@@ -216,6 +216,7 @@ class sim_data:
             ax.set_xlabel(var)
             ax.set_ylabel('counts')
         plt.tight_layout()
+        return(fig,axs)
 
     def de_e(self):
         return(np.std(self.good().start()['ke'])/\

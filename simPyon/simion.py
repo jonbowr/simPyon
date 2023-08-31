@@ -432,6 +432,7 @@ class simion:
                                                 norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
                                                                    vmax=np.nanmax(self.source['ke'].dist_out))),
                                         ax = ax,label = 'Ke [eV]',cax = cax)
+        return(fig,ax)
 
 
     def fly_trajectory_3d(self,n_parts = 100,cores = multiprocessing.cpu_count(),
@@ -760,7 +761,7 @@ class simion:
         from .particles import source
         import pandas as pd
 
-        usr_prgm_add = self.usr_prgm+'simion.workbench_program()\n adjustable max_time = 0   -- microseconds\n'+\
+        usr_prgm_add = self.usr_prgm+'\n simion.workbench_program()\n adjustable max_time = 0   -- microseconds\n'+\
                       'function segment.other_actions()\n if ion_time_of_flight >= max_time then\n'+\
                         'ion_splat = -1 \n end\n end'
 
@@ -803,7 +804,7 @@ class simion:
 
         dat = str_data_scrape(core_fly(self,len(xy),cores,quiet = True,
                                         rec_fil = 'simPyon_pe.rec',
-                                        trajectory_quality=0,usr_prgm = usr_prgm_add),len(xy),cores,quiet = False)
+                                        trajectory_quality=0,usr_prgm = usr_prgm_add),len(xy),cores,quiet = True)
         # 
         # v_df = pd.DataFrame(dat,columns = pe_head).sort_values(by = 'Ion number')
         # v_full = np.zeros(len(xy))
@@ -904,15 +905,15 @@ class simion:
             cax = divider.append_axes("right", size="5%", pad=0.05)
             if im:
                 cbar = plt.colorbar(im,ax = ax,label = colorbar_name,cax = cax)
-                if cont:
-                    cbar.set_ticks(cont.levels)
-                    cbar.set_ticklabels(cont.levels)
-            if cont:
-                tickmax = 15
-                skipo = int(len(cont.levels)/tickmax)+1
-                cbar = plt.colorbar(cont,ax = ax,label = colorbar_name,cax = cax)
-                cbar.set_ticks(cont.levels.round(0)[::skipo])
-                cbar.set_ticklabels(cont.levels.round(0)[::skipo])
+                # if cont:
+                #     cbar.set_ticks(cont.levels)
+                #     cbar.set_ticklabels(cont.levels)
+            # if cont:
+            #     tickmax = 15
+            #     skipo = int(len(cont.levels)/tickmax)+1
+            #     cbar = plt.colorbar(cont,ax = ax,label = colorbar_name,cax = cax)
+            #     cbar.set_ticks(cont.levels.round(0)[::skipo])
+            #     cbar.set_ticklabels(cont.levels.round(0)[::skipo])
                 # cbar.set_ticklabels(cbar.get_ticklabels()[::2])
         plt.tight_layout()
         ax.set_xlim(min(self.v_data['x']),max(self.v_data['x']))
