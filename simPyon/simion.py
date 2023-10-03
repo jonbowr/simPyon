@@ -609,6 +609,7 @@ class simion:
 
         fig,ax1 = self.geo.draw(fig = fig, ax = ax,
                                     origin = origin,
+                                    show_verts = show_verts,
                                     cmap = cmap,
                                     show_mirror = show_mirror)
 
