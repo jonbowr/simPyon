@@ -62,7 +62,8 @@ class simion:
     '''
     def __init__(self,volt_dict = {},
                  home = './',
-                 gemfil = '',recfil = '',
+                 gemfil = '',
+                 recfil = '',
                  traj_recfil = '',
                  bench = '',
                  pa = '',
@@ -73,7 +74,8 @@ class simion:
                  ):
         self.commands = []
         self.home = home
-        self.sim = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
+        self.sim_cmd = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
+        self.slt_cmd = r'sltools --nogui'
         self.elec_num = []
         self.pa = []
         self.usr_prgm = ''
@@ -553,28 +555,38 @@ class simion:
                         self.elect_dict[num] = line[line.find(
                             ';'):].strip(';').strip()
 
-    def run(self,quiet = False):
+    def run(self,quiet = False,run_with = 'simion'):
         '''
         Executes all of the initialized commands in self.commands
         '''
+        if run_with == 'simion':
+            cmdr = str(self.sim_cmd)
+        elif run_with == 'sl_tools':
+            cmdr = str(self.slt_cmd)
+
         if quiet == False:
             print(' ===============================================')
             print('| Executing Simion Command:')
             print(' ===============================================')
-            print(self.sim)
+            print(self.sim_cmd)
             print(self.commands)
         if quiet == True:
-            check = subprocess.Popen(self.sim + ' ' + self.commands,
+            check = subprocess.Popen(cmdr + ' ' + self.commands,
                 stdout = subprocess.PIPE)
         else:
-            check = subprocess.Popen(self.sim + ' ' + self.commands)
+            check = subprocess.Popen(cmdr + ' ' + self.commands)
         check.wait()
         check.kill()
         return check
     
-    def show(self,measure = False,label = False, origin = [0,0],
-             collision_locs = False,fig = [],ax = [],cmap = cm.viridis,
-             show_verts = False,show_mirror  = False):
+    def show(self,measure = False,
+             label = False, 
+             origin = [0,0],
+             collision_locs = False,
+             fig = [],ax = [],
+             cmap = cm.viridis,
+             show_verts = False,
+             show_mirror  = False):
         '''
         Plots the geometry stored geometry file by scraping the gemfile for 
         polygon shape and renders them in pyplot using a collection of patches. 
@@ -594,19 +606,11 @@ class simion:
             Point in the simmetry plane to shift the origin to for the displayed geometry. 
 
         '''
-        from .poly_gem import draw
-        if not ax:
-            fig,ax = plt.subplots()
-        for gm,pa_inf in zip(self.gemfil,self.pa_info):
-            fig,ax1 = draw(gm,canvas = [pa_inf['Lx'],
-                                        pa_inf['Ly']],
-                                        fig = fig, ax = ax,
-                                        mirror_ax = pa_inf['mirroring'],
-                                        origin = origin,cmap = cmap,show_verts = show_verts, show_mirror = show_mirror)
 
-        if show_verts == True:
-            ax1.vpts = ax1.plot(np.concatenate(self.geo.get_x())-origin[0],
-                     np.concatenate(self.geo.get_y())-origin[1],'.')[0]
+        fig,ax1 = self.geo.draw(fig = fig, ax = ax,
+                                    origin = origin,
+                                    cmap = cmap,
+                                    show_mirror = show_mirror)
 
         if measure == True:
             from . import fig_measure as meat
@@ -996,7 +1000,7 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
         loc_com += r" %s"%sim.bench
         sim.commands = loc_com
         f = tmp.TemporaryFile()
-        check = subprocess.Popen(sim.sim+' '+sim.commands,
+        check = subprocess.Popen(sim.sim_cmd+' '+sim.commands,
             stdout = f)
         checks.append((check,f))
 

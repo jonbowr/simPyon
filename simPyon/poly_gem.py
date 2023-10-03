@@ -181,9 +181,12 @@ def poly_unify(poly_polys):
     return(final_polys)
 
 def poly_draw(final_polys,canvas = [],
-              fig = [],ax = [],show_mirror= False,mirror_ax = None,
-              origin = np.zeros(2),cmap = cm.rainbow,
-              show_verts = False,sub_cols = False):
+              fig = [],ax = [],
+              show_mirror= False,
+              mirror_ax = None,
+              origin = np.zeros(2),
+              cmap = cm.rainbow,
+              sub_cols = False):
     from shapely.affinity import scale,translate
     if not fig:
         fig,ax = plt.subplots()
@@ -218,8 +221,6 @@ def poly_draw(final_polys,canvas = [],
                     patch.set_color(cmap(num/max(elecs)))
                 patch.set_linewidth(0)
                 ax.add_patch(patch)
-                # if show_verts == True:
-                #     ax.plot(xy[:,0],xy[:,1],'.')
 
     ax.autoscale(enable = True)
     ax.set_aspect('equal')
@@ -227,13 +228,14 @@ def poly_draw(final_polys,canvas = [],
 
 
 def draw(gemfil,canvas = [],mirror_ax = None,fig = [],ax = [],
-         origin = np.zeros(2),cmap = cm.viridis,show_verts = False,show_mirror = False):
+         origin = np.zeros(2),cmap = cm.viridis,show_mirror = False):
     electrodes = get_verts(gemfil)
     poly_polys =verts_to_polys(electrodes) 
     final_polys = poly_meld(poly_polys)
     fig,ax = poly_draw(final_polys,canvas = canvas,fig = fig,
                         ax = ax, mirror_ax = mirror_ax,
-                        origin = origin,cmap = cmap,show_verts = show_verts,show_mirror = show_mirror)
+                        origin = origin,cmap = cmap,
+                        show_mirror = show_mirror)
     return(fig,ax)
 
 def clean_verts(gemfil,canvas = [],mirror_ax = None,fig = [],ax = [],origin = np.zeros(2)):

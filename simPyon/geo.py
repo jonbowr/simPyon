@@ -1,6 +1,7 @@
 from . import poly_gem as pg
 from shapely.ops import unary_union
 import numpy as np
+from matplotlib import cm
 # from descartes import PolygonPatch
 # from matplotlib import pyplot as plt
 
@@ -219,10 +220,26 @@ class geo:
         return(fig,ax)
 
 
-    def draw(self):
+    def draw(self,canvas = [],
+              fig = [],ax = [],
+              show_mirror= False,
+              mirror_ax = None,
+              origin = np.zeros(2),
+              cmap = cm.viridis,
+              sub_cols = False,
+              show_verts = False):
+        # from matplotlib import cm
+        if not ax:
+            from matplotlib import pyplot as plt
+            fig,ax = plt.subplots()
+        fig,ax1 = pg.poly_draw(self.get_grouped_polys(),
+                              canvas = canvas,
+                              fig = fig,ax = ax, mirror_ax = mirror_ax,
+                            origin = origin,cmap = cmap,show_mirror = show_mirror)
+        if show_verts == True:
+            ax1.vpts = ax1.plot(np.concatenate(self.get_x())-origin[0],
+                     np.concatenate(self.get_y())-origin[1],'.')[0]
 
-        from matplotlib import cm
-        fig,ax = pg.poly_draw(self.get_grouped_polys(),sub_cols = True,cmap = cm.viridis)
         return(fig,ax)
     # def get_patches(self):
     #     patches = {}
