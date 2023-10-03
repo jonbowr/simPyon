@@ -76,7 +76,7 @@ class simion:
         self.sim = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
         self.elec_num = []
         self.pa = []
-        self.usr_prgm = 'simion.workbench_program() \n function segment.other_actions() \n end'
+        self.usr_prgm = ''
         self.elect_dict = {}
         self.volt_dict = volt_dict
         self.recfil = recfil
@@ -126,16 +126,9 @@ class simion:
             self.get_elec_nums_gem(gm)
             self.gem_nums.append(gem.get_elec_nums_gem(gm)[0])
             self.pa_info.append(gem.get_pa_info(gm))
-
-        pa = 1
-        for pai in self.pa_info:
-            if 'pa_offset_position' in pai:
-                self.usr_prgm+='\nfunction segment.load() \n'
-                for d,v in zip(['x','y','z'],pai['pa_offset_position']):
-                    self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
-                self.usr_prgm+='end \n'
-            pa +=1
                 
+        self.setup_usr_program()
+
         self.geo = geo(self.gemfil)
         self.params = {'volts':self.volt_dict}
 
@@ -745,6 +738,19 @@ class simion:
             self.master_volts[elec_name] = volt_dict[elec_name]
             os.system('cls' if os.name == 'nt' else 'clear')
         return(self.master_volts)
+
+    def setup_usr_program(self):
+        self.usr_prgm = 'simion.workbench_program() \n function segment.other_actions() \n end'
+        pa = 1
+        for pai in self.pa_info:
+            if 'pa_offset_position' in pai:
+                self.usr_prgm+='\nfunction segment.load() \n'
+                for d,v in zip(['x','y','z'],pai['pa_offset_position']):
+                    self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
+                self.usr_prgm+='end \n'
+            pa +=1
+
+
 
     def scale_volts(self,volt_dict,scale_fact):
         '''
