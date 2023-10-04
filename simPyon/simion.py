@@ -353,7 +353,7 @@ class simion:
     def fly_trajectory(self,n_parts = 100,cores = multiprocessing.cpu_count(),
                       quiet = True, dat_step = 30,show= True,
                       fig = [],ax = [],cmap = 'eng',eng_cmap = cm.plasma,plt_kwargs = {},
-                      show_cbar = True,label = '',xlim = [-np.inf,np.inf]):
+                      show_cbar = True,label = '',xlim = [-np.inf,np.inf],plot_3d = False):
         '''
         Fly n_parts particles, and plot their trajectories. Uses the particle probability 
         distributions defined in self.source, but tracks the particle movement. 
@@ -409,100 +409,18 @@ class simion:
             if cmap == 'eng':
                 from matplotlib import cm
                 from mpl_toolkits.axes_grid1 import make_axes_locatable
-            if not ax:
-                fig,ax = self.show()
-            else:
-                self.show(fig = fig,ax = ax)
-            # for traj in self.traj_data:
-            def traj_pltr(traj):
-                if cmap == 'eng':
-                    plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
-                ax.plot(traj[self.pa_info[0]['base']],traj['r'],**plt_kwargs)
-            self.traj_data.groupby('n').apply(traj_pltr)
-            # ax.plot(traj[self.pa_info[0]['base']],traj['r'],label = label)
-            if cmap == 'eng' and show_cbar == True:
-                divider = make_axes_locatable(ax)
-                cax = divider.append_axes("right", size="5%", pad=0.05)
-                cbar = plt.colorbar(plt.cm.ScalarMappable(cmap=eng_cmap, 
-                                                norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
-                                                                   vmax=np.nanmax(self.source['ke'].dist_out))),
-                                        ax = ax,label = 'Ke [eV]',cax = cax)
-        return(fig,ax)
-
-
-    def fly_trajectory_3d(self,n_parts = 100,cores = multiprocessing.cpu_count(),
-                      quiet = True, dat_step = 30,show= True,geo_3d = False,
-                      fig = [],ax = [],cmap = 'eng',eng_cmap = cm.plasma,plt_kwargs = {},
-                      show_cbar = True,label = '',xlim = [-np.inf,np.inf]):
-        '''
-        Fly n_parts particles, and plot their trajectories. Uses the particle probability 
-        distributions defined in self.source, but tracks the particle movement. 
-        Parallelizes the fly processes by spawing a number of instances associated with the
-        number of cores of the processing computer. Resulting particle data is stored in 
-        self.traj_data as a list of dictionaries. 
-
-        Parameters
-        ----------
-        n_parts: int
-            number of particles to be flown. n_parts/cores number of particles is flown in each 
-            instance of simion on each core. 
-        cores: int
-            number of cores to use to process the fly particles request. Default initializes 
-            a simion instance to run on each core. 
-        quiet: bool
-            With quiet == True, the preparation statement from one of the simion 
-            instances is printed to cmd. 
-        '''
-
-        # Copy Traj record file to working home directory
-        # if os.path.isfile(self.home+'simPyon_traj.rec')==False:
-
-        if self.traj_refil == '':
-            copy("%s/rec/simPyon_traj.rec"%\
-                            os.path.dirname(os.path.dirname(__file__)+'..'),
-                            self.home)
-            # os.remove(self.home+'simPyon_traj.rec')
-
-        # Write the workbench program in 'usr_prgm'
-        # if self.bench:
-        #     with open(self.bench.replace('iob','lua'),'w') as fil:
-        #         fil.write(self.usr_prgm)
-
-        start_time = time.time()
-        # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,quiet,
-                        rec_fil = os.path.join(self.home,'simPyon_traj.rec'),
-                        markers = 20,trajectory_quality = 0)
-        data = str_data_scrape(outs,n_parts,cores,quiet)
-        
-        if quiet == False:
-            print(time.time() - start_time)
-        
-        # Parse the trajectory data into list of dictionaries
-        head = ["X","Y","Z","V","Grad V","ke"]
-        self.traj_data = []
-        for n in np.unique(data[:,0]):
-            self.traj_data.append(dict([h.lower(),arr[data[:,0]==n]] for h,arr in zip(head,np.transpose(data[:,1:]))))
-
-        # calculate the r position vec
-        for dat in self.traj_data:
-            dat['r'] = np.sqrt(dat['z']**2+dat[self.pa_info[0]['mirroring']]**2)
-
-        # Plot the trajectories
-        if show == True:
-            if geo_3d == False:
-                if cmap == 'eng':
-                    from matplotlib import cm
-                    from mpl_toolkits.axes_grid1 import make_axes_locatable
+            if plot_3d==False:
                 if not ax:
                     fig,ax = self.show()
                 else:
                     self.show(fig = fig,ax = ax)
-                for traj in self.traj_data:
+                # for traj in self.traj_data:
+                def traj_pltr(traj):
                     if cmap == 'eng':
-                        plt_kwargs['color'] = eng_cmap(traj['ke'][0]/np.max(self.source['ke'].dist_out))
+                        plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
                     ax.plot(traj[self.pa_info[0]['base']],traj['r'],**plt_kwargs)
-                ax.plot(traj[self.pa_info[0]['base']],traj['r'],label = label)
+                self.traj_data.groupby('n').apply(traj_pltr)
+                # ax.plot(traj[self.pa_info[0]['base']],traj['r'],label = label)
                 if cmap == 'eng' and show_cbar == True:
                     divider = make_axes_locatable(ax)
                     cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -510,25 +428,26 @@ class simion:
                                                     norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
                                                                        vmax=np.nanmax(self.source['ke'].dist_out))),
                                             ax = ax,label = 'Ke [eV]',cax = cax)
-            if geo_3d == True:
+            else:
                 from mpl_toolkits.mplot3d import Axes3D,art3d
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection='3d')
-                # elec_verts = self.geo.get_xy()
+                elec_verts = self.geo.get_xy()
                 for el in self.geo.get_xy():
                     # for vt in el:
                     vt = el[np.logical_and(el[:,0]>xlim[0],el[:,0]<xlim[1])]
                     ax.plot(vt[:,0],np.zeros(len(vt)),vt[:,1],
                             color = 'grey')
                         
-                for traj in self.traj_data:
-                    ax.plot(traj['x'],-traj['z'],traj['y'])
+                def traj_pltr_3d(traj):
+                    if cmap == 'eng':
+                        plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
+                    ax.plot(traj['x'],-traj['z'],traj['y'],**plt_kwargs)
+                self.traj_data.groupby('n').apply(traj_pltr_3d)
                 ax.view_init(30, -70)
                 ax.set_xlim(0,200)
-                ax.set_xlim(0,200)
+                ax.set_zlim(0,200)
                 ax.set_ylim(-100,100)
-                
-                return(fig,ax)
         return(fig,ax)
 
     def get_elec_nums_gem(self, gem_fil=[]):
