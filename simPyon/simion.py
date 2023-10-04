@@ -172,8 +172,14 @@ class simion:
         self.pa = pa
         for gm,pm in zip(gemfil,pa):
             self.commands = r"gem2pa %s %s%s" % (gm, pm,pa_tag)
-            self.pa = pa
             self.run()
+
+    def pa2stl(self,pa=[],pa_tag = '0',numsectors = 180):
+        if not pa:
+            pa = list(self.pa)
+        for pm in pa:
+            self.commands = r"pa2stl --in %s%s --numsectors %d" % (pm,pa_tag,numsectors)
+            self.run(run_with='sl_tools')
 
     def refine(self,pa = []):
         '''
@@ -487,7 +493,7 @@ class simion:
             print(' ===============================================')
             print('| Executing Simion Command:')
             print(' ===============================================')
-            print(self.sim_cmd)
+            print(cmdr)
             print(self.commands)
         if quiet == True:
             check = subprocess.Popen(cmdr + ' ' + self.commands,
