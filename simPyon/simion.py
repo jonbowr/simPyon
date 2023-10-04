@@ -174,7 +174,7 @@ class simion:
             self.commands = r"gem2pa %s %s%s" % (gm, pm,pa_tag)
             self.run()
 
-    def pa2stl(self,pa=[],pa_tag = '0',numsectors = 180):
+    def pa2stl(self,pa=[],pa_tag = '0',numsectors = 90):
         if not pa:
             pa = list(self.pa)
         for pm in pa:
@@ -390,9 +390,9 @@ class simion:
             # os.remove(self.home+'simPyon_traj.rec')
 
         # Write the workbench program in 'usr_prgm'
-        # if self.bench:
-        #     with open(self.bench.replace('iob','lua'),'w') as fil:
-        #         fil.write(self.usr_prgm)
+        if self.bench:
+            with open(self.bench.replace('iob','lua'),'w') as fil:
+                fil.write(self.usr_prgm)
 
         start_time = time.time()
         # Fly the particles in parallel and scrape the resulting data from the shell
@@ -435,25 +435,45 @@ class simion:
                                                                        vmax=np.nanmax(self.source['ke'].dist_out))),
                                             ax = ax,label = 'Ke [eV]',cax = cax)
             else:
+                from stl import mesh
                 from mpl_toolkits.mplot3d import Axes3D,art3d
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-                elec_verts = self.geo.get_xy()
-                for el in self.geo.get_xy():
-                    # for vt in el:
-                    vt = el[np.logical_and(el[:,0]>xlim[0],el[:,0]<xlim[1])]
-                    ax.plot(vt[:,0],np.zeros(len(vt)),vt[:,1],
-                            color = 'grey')
-                        
+                from matplotlib.colors import LightSource
+
+                def view_stl(stl,figure = [],axes = [],origin = np.zeros(3),col = 'r'):
+                    your_mesh = mesh.Mesh.from_file(stl)
+                    for shift,dim in zip(origin,[your_mesh.x,your_mesh.y,your_mesh.z]):
+                        dim+=shift
+                    if not axes:
+                        figure = plt.figure()
+                        axes = figure.add_subplot(111,projection = '3d')
+                    d_thing = art3d.Poly3DCollection(your_mesh.vectors[your_mesh.vectors[:,2,1]>0],
+                                                                     lightsource = LightSource(),
+                                                                         shade = True,edgecolors = [col],
+                                                                 facecolors = [col],
+                                                                    capstyle = 'butt')
+                    d_thing.set_antialiased(True)
+                    axes.add_collection3d(d_thing)
+
+                    # Auto scale to the mesh size
+                    scale = your_mesh.points.flatten()
+                    axes.auto_scale_xyz(scale, scale, scale)
+                    return(d_thing)
+                
+                figure = plt.figure()
+                figure.set_size_inches(8,8)
+                ax = figure.add_subplot(111,projection = '3d')
+                for pa,info in zip(self.pa,self.pa_info):
+                    thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
+                # axes.set_xlim(0,300)
                 def traj_pltr_3d(traj):
                     if cmap == 'eng':
                         plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
-                    ax.plot(traj['x'],-traj['z'],traj['y'],**plt_kwargs)
+                    ax.plot(traj['x'],traj['y'],traj['z'],**plt_kwargs)
                 self.traj_data.groupby('n').apply(traj_pltr_3d)
                 ax.view_init(30, -70)
-                ax.set_xlim(0,200)
-                ax.set_zlim(0,200)
-                ax.set_ylim(-100,100)
+                # ax.set_xlim(0,200)
+                # ax.set_zlim(0,200)
+                # ax.set_ylim(-100,100)
         return(fig,ax)
 
     def get_elec_nums_gem(self, gem_fil=[]):
@@ -536,7 +556,8 @@ class simion:
                                     origin = origin,
                                     show_verts = show_verts,
                                     cmap = cmap,
-                                    show_mirror = show_mirror)
+                                    show_mirror = show_mirror,
+                                    mirror_ax = self.pa_info[0]['mirroring'])
 
         if measure == True:
             from . import fig_measure as meat
@@ -672,15 +693,14 @@ class simion:
     def setup_usr_program(self):
         self.usr_prgm = 'simion.workbench_program() \n function segment.other_actions() \n end'
         pa = 1
+
+        self.usr_prgm+='\nfunction segment.load() \n'
         for pai in self.pa_info:
             if 'pa_offset_position' in pai:
-                self.usr_prgm+='\nfunction segment.load() \n'
                 for d,v in zip(['x','y','z'],pai['pa_offset_position']):
                     self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
-                self.usr_prgm+='end \n'
             pa +=1
-
-
+        self.usr_prgm+='end \n'
 
     def scale_volts(self,volt_dict,scale_fact):
         '''
@@ -703,9 +723,9 @@ class simion:
 
         tot_pa = pd.DataFrame(self.pa_info)
         if not x_rng:
-            x_rng = [0,max(tot_pa['Lx']*tot_pa['pxls_mm'])]
+            x_rng = [0,max(tot_pa['Lx']*tot_pa['pxls_mm']+np.stack(tot_pa['pa_offset_position'])[:,0])]
         if not y_rng:
-            y_rng = [0,max(tot_pa['Ly']*tot_pa['pxls_mm'])]
+            y_rng = [0,max(tot_pa['Ly']*tot_pa['pxls_mm']+np.stack(tot_pa['pa_offset_position'])[:,1])]
 
 
         x = np.linspace(x_rng[0],x_rng[1],int((x_rng[1]-x_rng[0])/mm_pt))
