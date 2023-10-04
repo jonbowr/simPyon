@@ -2,8 +2,6 @@ from . import poly_gem as pg
 from shapely.ops import unary_union
 import numpy as np
 from matplotlib import cm
-# from descartes import PolygonPatch
-# from matplotlib import pyplot as plt
 
 class geo:
 
@@ -31,9 +29,6 @@ class geo:
         from IPython.display import display
         display(self.get_single_poly())
 
-    # def __repr__(self):
-        # return(self.get_single_poly().__repr__())
-# 
 
     def get_xy(self):
         xy = []
@@ -80,9 +75,11 @@ class geo:
         return(y)
 
     def get_polys(self): 
+        # generates electrode num dict, with each entry containing list of individual polygons
         return(pg.poly_meld(pg.verts_to_polys(self.gem_verts)))
 
     def get_grouped_polys(self):
+        # generates electrode num dict, with each entry containing Multipolygon patch
         poly_group = {}
         polys = self.get_polys()
 
@@ -94,12 +91,16 @@ class geo:
         return(poly_group)
 
     def get_single_poly(self):
+        # generates single multipolygon patch with all geo polygons
         return(unary_union([g for p in self.get_polys().values() for g in p]))
 
     def get_subgrouped_polys(self):
+        # generates electrode based dictionary of list of multipolygons grouped by definition in gemfil
         return(pg.poly_unify(pg.verts_to_polys(self.gem_verts)))
 
     def get_all_polys(self):
+        # generates single multipolygon patch with all geo polygons not sure what is diff from get_single poly
+
         from shapely.geometry.multipolygon import MultiPolygon as mp
         return(mp([thing for stuff in self.get_grouped_polys().values() for thing in stuff]))
         

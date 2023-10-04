@@ -67,8 +67,11 @@ def get_pa_info(gem_file):
                            'symmetry':info[3].strip().lower(),
                            'mirroring': info[4].strip()[0].lower(),
                            'base':('y' if info[4].strip()[0].lower() == 'x' else 'x'),
-                           'pxls_mm':float(info[7])
+                           'pxls_mm':float(info[7]),
+                           'pa_offset_position':np.zeros(3)
                            }
+            break
+
     for line in file_lines: 
         if 'SET_PA_LOCATION' in line:
             pa_loc = [float(val) for val in within(line,'[',']').split(',')]

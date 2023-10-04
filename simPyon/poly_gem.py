@@ -35,7 +35,7 @@ class gem_poly:
         else:
             return()
 
-def get_verts(gemfil):
+def get_verts(gemfil,clip_canvas = True):
     fil = open(gemfil,'r')
     lines = fil.readlines()
     # clean lines and remove comments
@@ -57,6 +57,14 @@ def get_verts(gemfil):
 
     # split lines by electrode declaration
     electrode_list = tot_line.lower().split('electrode')[1:]
+
+    if clip_canvas:
+        from .gem import get_pa_info
+        pa_inf = get_pa_info(gemfil)
+        pa_off = pa_inf['pa_offset_position']
+        pax = pa_inf['Lx']*pa_inf['pxls_mm']
+        pay = pa_inf['Ly']*pa_inf['pxls_mm']
+        canvas_box = np.array([pa_off[0],pa_off[1],pax+pa_off[0],pay+pa_off[1]])
 
     # subdivide draw commands by electrode, fill, and drawtype
     electrodes = {}
@@ -92,10 +100,14 @@ def get_verts(gemfil):
                                     verts = (verts.reshape(-1,2)+locate[:2]).flatten()
                                     sep_poly['shape'].append(nam)
                                     sep_poly['verts'].append(verts)
+                            if clip_canvas:
+                                sep_poly['shape'].append('box')
+                                sep_poly['verts'].append(canvas_box)
                             fill['dtype'].append(dtype_split[0])
-                            fill['polys'].append(sep_poly)
+                            fill['polys'].append(sep_poly)        
                     else:
                         locate = np.array([0,0,0,1])
+
                 electrodes[e_num].append(fill)
 
     return(electrodes)
@@ -116,8 +128,7 @@ def verts_to_polys(electrodes,origin = np.array([0,0])):
                     if len(list(polys.values())[0])>1:
                         if polys['shape'][1].lower() == 'box':
                             clip = gd.get_poly(polys['shape'][1],polys['verts'][1])
-                            poly = poly.symmetric_difference(poly.difference(clip))
-                            
+                            poly = poly.symmetric_difference(poly.difference(clip))        
                     if dtype == 'within':
                         inpolys.append(poly)
                     elif dtype == 'notin':
