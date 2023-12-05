@@ -7,10 +7,9 @@
 ;=============================================================================================================
 
 
-pa_define(1750,1750,1,cylindrical,y_mirror) ; Reduce Sim Size to increase proccessing efficiency (CS chamber -> TOF)
-locate(0,0,0,10) ;RELOC_SKIP
+pa_define(1750,1750,1,cylindrical,y_mirror,electrostatic,,0.1,surface = fractional)
+
 ; to use with 0.1  mm / grid unit (the last value in this vector is what determines the resolution)         New
-{
   ;===========================================================================
   ; ESA (CE)
   ;===========================================================================
@@ -172,5 +171,12 @@ locate(0,0,0,10) ;RELOC_SKIP
         161.2,68.2,161.2,68.2,171.6)}
     }
   }
+    electrode(1) ;Stop plate
+  {
+    fill{
+      within{
+        box(67.9,30,69.3,55)
+    }
+}
   
   }; End of Doc

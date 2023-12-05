@@ -271,12 +271,9 @@ class simion:
             print(' ===============================================')
             print('| Fast Adjusting with Voltage Settings:')
             print( '===============================================')
-            # print(self.volt_dict)
+
             for elec_n,volt in zip(self.elec_num,volts):
                 print('| %s: %.2f '%(self.elect_dict[elec_n],volt))
-            # for val in self.elec_num:
-            #     print(self.elect_dict[val])
-            # print(volts)
         num_volts = {}
         for num,volt in zip(self.elec_num,volts):
             dict_out[self.elect_dict[num]] = volt
@@ -544,9 +541,6 @@ class simion:
         mark: bool
             With mark == True, adds draggable points displaying points the symmetry plane using
             the fig_measure.mark function. 
-        annotate: bool 
-            With annotate == True, names or numbers of each of the electrodes are overlaid
-            on the plotted geometry using the figmeasure.annote function
         origin: [0x2] list
             Point in the simmetry plane to shift the origin to for the displayed geometry. 
 
@@ -785,7 +779,7 @@ class simion:
     def show_pe(self,param = 'v',cmap = cm.jet,vmax = None,
                 vmin = None,imtype = 'both',levels = 10,
                 colorbar_name = '',
-                gaussian_sigma = 1,log = True,thresh = 200):
+                gaussian_sigma = 1,log = False,thresh = 200):
 
         def sym_logspace(start,stop,num,thresh=1):
             rng = abs(stop-start)
