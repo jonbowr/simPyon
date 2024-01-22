@@ -1,5 +1,5 @@
 from . import poly_gem as pg
-from shapely.ops import unary_union
+from shapely.ops import unary_union,nearest_points
 import numpy as np
 from matplotlib import cm
 
@@ -203,6 +203,15 @@ class geo:
                         elect_labels[num].append(line[line.find(
                             ';'):].strip(';').strip())
         return(elect_labels)
+
+    def get_normal(self,xy_pts,buffer = .05):
+        from shapely.geometry import MultiPoint
+        pol = self.get_single_poly().buffer(buffer).boundary
+        pts = MultiPoint(xy_pts)
+        verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        return(verts)
+        diff = verts-xy_pts
+        return(np.arctan2(diff[:,1],diff[:,0])*180/np.pi)
 
     def ddraw(self,label = False):
         from matplotlib import cm

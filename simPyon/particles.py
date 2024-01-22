@@ -40,6 +40,7 @@ class pdf:
         return(k*(x-a0)/(x-a1)**4)
 
     def poisson(x1,b,c,k):
+        # b0 = .405*k
         a=1
         x = (x1-c)/b
         norm = k**k*np.exp(-k)/np.math.factorial(k)

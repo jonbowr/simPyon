@@ -431,47 +431,47 @@ class simion:
                                                     norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
                                                                        vmax=np.nanmax(self.source['ke'].dist_out))),
                                             ax = ax,label = 'Ke [eV]',cax = cax)
-            else:
-                from stl import mesh
-                from mpl_toolkits.mplot3d import Axes3D,art3d
-                from matplotlib.colors import LightSource
+            return(fig,ax)
+        else:
+            from stl import mesh
+            from mpl_toolkits.mplot3d import Axes3D,art3d
+            from matplotlib.colors import LightSource
 
-                def view_stl(stl,figure = [],axes = [],origin = np.zeros(3),col = 'r'):
-                    your_mesh = mesh.Mesh.from_file(stl)
-                    for shift,dim in zip(origin,[your_mesh.x,your_mesh.y,your_mesh.z]):
-                        dim+=shift
-                    if not axes:
-                        figure = plt.figure()
-                        axes = figure.add_subplot(111,projection = '3d')
-                    d_thing = art3d.Poly3DCollection(your_mesh.vectors[your_mesh.vectors[:,2,1]>0],
-                                                                     lightsource = LightSource(),
-                                                                         shade = True,edgecolors = [col],
-                                                                 facecolors = [col],
-                                                                    capstyle = 'butt')
-                    d_thing.set_antialiased(True)
-                    axes.add_collection3d(d_thing)
+            def view_stl(stl,figure = [],axes = [],origin = np.zeros(3),col = 'r'):
+                your_mesh = mesh.Mesh.from_file(stl)
+                for shift,dim in zip(origin,[your_mesh.x,your_mesh.y,your_mesh.z]):
+                    dim+=shift
+                if not axes:
+                    figure = plt.figure()
+                    axes = figure.add_subplot(111,projection = '3d')
+                d_thing = art3d.Poly3DCollection(your_mesh.vectors[your_mesh.vectors[:,2,1]>0],
+                                                                 lightsource = LightSource(),
+                                                                     shade = True,edgecolors = [col],
+                                                             facecolors = [col],
+                                                                capstyle = 'butt')
+                d_thing.set_antialiased(True)
+                axes.add_collection3d(d_thing)
 
-                    # Auto scale to the mesh size
-                    scale = your_mesh.points.flatten()
-                    axes.auto_scale_xyz(scale, scale, scale)
-                    return(d_thing)
-                
-                figure = plt.figure()
-                figure.set_size_inches(8,8)
-                ax = figure.add_subplot(111,projection = '3d')
-                for pa,info in zip(self.pa,self.pa_info):
-                    thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
-                # axes.set_xlim(0,300)
-                def traj_pltr_3d(traj):
-                    if cmap == 'eng':
-                        plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
-                    ax.plot(traj['x'],traj['y'],traj['z'],**plt_kwargs)
-                self.traj_data.groupby('n').apply(traj_pltr_3d)
-                ax.view_init(30, -70)
-                # ax.set_xlim(0,200)
-                # ax.set_zlim(0,200)
-                # ax.set_ylim(-100,100)
-        return(fig,ax)
+                # Auto scale to the mesh size
+                scale = your_mesh.points.flatten()
+                axes.auto_scale_xyz(scale, scale, scale)
+                return(d_thing)
+            
+            figure = plt.figure()
+            figure.set_size_inches(8,8)
+            ax = figure.add_subplot(111,projection = '3d')
+            for pa,info in zip(self.pa,self.pa_info):
+                thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
+            # axes.set_xlim(0,300)
+            def traj_pltr_3d(traj):
+                if cmap == 'eng':
+                    plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
+                ax.plot(traj['x'],traj['y'],traj['z'],**plt_kwargs)
+            self.traj_data.groupby('n').apply(traj_pltr_3d)
+            ax.view_init(30, -70)
+            # ax.set_xlim(0,200)
+            # ax.set_zlim(0,200)
+            # ax.set_ylim(-100,100)
 
     def get_elec_nums_gem(self, gem_fil=[]):
         '''
@@ -705,6 +705,27 @@ class simion:
         for num,nam in self.elect_dict.items():
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
         return(s_volts)
+
+    def fix_stops(self,data,v_extrap = True):
+        # uses the shapely instrument geometry to set points on surface of polygon
+        #   to prevent pixlization collisions on reinitialization using collision locs
+        from shapely.geometry import MultiPoint
+        from shapely.ops import nearest_points
+        pol = self.geo.get_single_poly().boundary
+        pts = MultiPoint(data[['x','r']])
+        verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        if v_extrap:
+            #calc offset distance of point from surface
+            mm_offset = np.sqrt((data['x'] -verts[:,0])**2+(data['r'] - verts[:,1])**2)
+            # step the particles backward according to offset distance
+            #    in trajectory based on their velocity
+            for dim in ['x','r']:
+                data[dim] = data[dim]-data['v'+dim]/abs(data['v'+dim])*mm_offset
+            pts = MultiPoint(data[['x','r']])
+            verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        data['x'] = verts[:,0]
+        data['r'] = verts[:,1]
+        return(data)
 
     def calc_pe(self,mm_pt=10,x_rng = None,y_rng = None,param = 'v',
                         cores = multiprocessing.cpu_count()):
