@@ -21,10 +21,12 @@ class sim_data:
                             "Azm","Elv","Vx","Vy","Vz","KE"],
                  symmetry='cylindrical',
                  mirroring='y',
-                 obs = {'X_MAX':X_MAX,'X_MIN':X_MIN,
-                        'R_MAX':R_MAX,'R_MIN':R_MIN,
-                        'TOF_MEASURE':TOF_MEASURE,
-                        'R_WEIGHT':R_WEIGHT}):
+                 obs = {'X_MAX':float(X_MAX),
+                        'X_MIN':float(X_MIN),
+                        'R_MAX':float(R_MAX),
+                        'R_MIN':float(R_MIN),
+                        'TOF_MEASURE':bool(TOF_MEASURE),
+                        'R_WEIGHT':float(R_WEIGHT)}):
 
         if type(data) is np.ndarray:
             self.header = headder
@@ -84,10 +86,10 @@ class sim_data:
                     self.df[head.lower()] = arr
             else:
                 self.df = data.df.copy()
-            self.symmetry = data.symmetry
-            self.mirror_ax = data.mirror_ax
-            self.base_ax = data.base_ax
-            self.obs = data.obs
+            self.symmetry = str(data.symmetry)
+            self.mirror_ax = str(data.mirror_ax)
+            self.base_ax = str(data.base_ax)
+            self.obs = dict(data.obs)
 
     def __call__(self):
         return(self.df)
@@ -157,6 +159,12 @@ class sim_data:
                 self[name][stops] = data
         return(self)
 
+    def append(self,data):
+        dat = data.copy()
+        dat['ion n'] = dat['ion n']+self['ion n'].max()
+        self.df =self.df.append(dat)
+        return(self)
+
     def throughput(self,weights = True):
         if weights:
             return(np.sum(self.good().start().df['counts'])/\
@@ -181,6 +189,12 @@ class sim_data:
                     self['r'][stops] < self.obs['R_MAX'],
                     self['r'][stops] > self.obs['R_MIN']
                     ])
+        goot = np.logical_and.reduce([
+            self[self.base_ax][stops] > self.obs['X_MIN'],
+            self[self.base_ax][stops] < self.obs['X_MAX'],
+            self['r'][stops] < self.obs['R_MAX'],
+            self['r'][stops] > self.obs['R_MIN']
+            ])
 
         if self.obs['TOF_MEASURE'] == True:
             # need to remove to generalize class
