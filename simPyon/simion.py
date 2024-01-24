@@ -351,7 +351,7 @@ class simion:
         if quiet == False:
             print(time.time() - start_time)
 
-        return(self.data)
+        return(self.data.copy())
 
     def fly_trajectory(self,n_parts = 100,cores = multiprocessing.cpu_count(),
                       quiet = True, dat_step = 30,show= True,
@@ -415,13 +415,13 @@ class simion:
             if plot_3d==False:
                 if not ax:
                     fig,ax = self.show()
-                else:
-                    self.show(fig = fig,ax = ax)
+                # else:
+                #     self.show(fig = fig,ax = ax)
                 # for traj in self.traj_data:
                 def traj_pltr(traj):
                     if cmap == 'eng':
                         plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
-                    ax.plot(traj[self.pa_info[0]['base']],traj['r'],**plt_kwargs)
+                    ax.plot(traj[self.pa_info[0]['base']],traj['r'],markevery = [-1],marker='.',markerfacecolor='k',**plt_kwargs)
                 self.traj_data.groupby('n').apply(traj_pltr)
                 # ax.plot(traj[self.pa_info[0]['base']],traj['r'],label = label)
                 if cmap == 'eng' and show_cbar == True:
@@ -431,47 +431,47 @@ class simion:
                                                     norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
                                                                        vmax=np.nanmax(self.source['ke'].dist_out))),
                                             ax = ax,label = 'Ke [eV]',cax = cax)
-            return(fig,ax)
-        else:
-            from stl import mesh
-            from mpl_toolkits.mplot3d import Axes3D,art3d
-            from matplotlib.colors import LightSource
+                return(fig,ax)
+            else:
+                from stl import mesh
+                from mpl_toolkits.mplot3d import Axes3D,art3d
+                from matplotlib.colors import LightSource
 
-            def view_stl(stl,figure = [],axes = [],origin = np.zeros(3),col = 'r'):
-                your_mesh = mesh.Mesh.from_file(stl)
-                for shift,dim in zip(origin,[your_mesh.x,your_mesh.y,your_mesh.z]):
-                    dim+=shift
-                if not axes:
-                    figure = plt.figure()
-                    axes = figure.add_subplot(111,projection = '3d')
-                d_thing = art3d.Poly3DCollection(your_mesh.vectors[your_mesh.vectors[:,2,1]>0],
-                                                                 lightsource = LightSource(),
-                                                                     shade = True,edgecolors = [col],
-                                                             facecolors = [col],
-                                                                capstyle = 'butt')
-                d_thing.set_antialiased(True)
-                axes.add_collection3d(d_thing)
+                def view_stl(stl,figure = [],axes = [],origin = np.zeros(3),col = 'r'):
+                    your_mesh = mesh.Mesh.from_file(stl)
+                    for shift,dim in zip(origin,[your_mesh.x,your_mesh.y,your_mesh.z]):
+                        dim+=shift
+                    if not axes:
+                        figure = plt.figure()
+                        axes = figure.add_subplot(111,projection = '3d')
+                    d_thing = art3d.Poly3DCollection(your_mesh.vectors[your_mesh.vectors[:,2,1]>0],
+                                                                     lightsource = LightSource(),
+                                                                         shade = True,edgecolors = [col],
+                                                                 facecolors = [col],
+                                                                    capstyle = 'butt')
+                    d_thing.set_antialiased(True)
+                    axes.add_collection3d(d_thing)
 
-                # Auto scale to the mesh size
-                scale = your_mesh.points.flatten()
-                axes.auto_scale_xyz(scale, scale, scale)
-                return(d_thing)
-            
-            figure = plt.figure()
-            figure.set_size_inches(8,8)
-            ax = figure.add_subplot(111,projection = '3d')
-            for pa,info in zip(self.pa,self.pa_info):
-                thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
-            # axes.set_xlim(0,300)
-            def traj_pltr_3d(traj):
-                if cmap == 'eng':
-                    plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
-                ax.plot(traj['x'],traj['y'],traj['z'],**plt_kwargs)
-            self.traj_data.groupby('n').apply(traj_pltr_3d)
-            ax.view_init(30, -70)
-            # ax.set_xlim(0,200)
-            # ax.set_zlim(0,200)
-            # ax.set_ylim(-100,100)
+                    # Auto scale to the mesh size
+                    scale = your_mesh.points.flatten()
+                    axes.auto_scale_xyz(scale, scale, scale)
+                    return(d_thing)
+                
+                figure = plt.figure()
+                figure.set_size_inches(8,8)
+                ax = figure.add_subplot(111,projection = '3d')
+                for pa,info in zip(self.pa,self.pa_info):
+                    thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
+                # axes.set_xlim(0,300)
+                def traj_pltr_3d(traj):
+                    if cmap == 'eng':
+                        plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
+                    ax.plot(traj['x'],traj['y'],traj['z'],**plt_kwargs)
+                self.traj_data.groupby('n').apply(traj_pltr_3d)
+                ax.view_init(30, -70)
+                # ax.set_xlim(0,200)
+                # ax.set_zlim(0,200)
+                # ax.set_ylim(-100,100)
 
     def get_elec_nums_gem(self, gem_fil=[]):
         '''
@@ -706,27 +706,6 @@ class simion:
             s_volts[nam]=m_volts[num]*(scale_fact if num < 16 else 1)
         return(s_volts)
 
-    def fix_stops(self,data,v_extrap = True):
-        # uses the shapely instrument geometry to set points on surface of polygon
-        #   to prevent pixlization collisions on reinitialization using collision locs
-        from shapely.geometry import MultiPoint
-        from shapely.ops import nearest_points
-        pol = self.geo.get_single_poly().boundary
-        pts = MultiPoint(data[['x','r']])
-        verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
-        if v_extrap:
-            #calc offset distance of point from surface
-            mm_offset = np.sqrt((data['x'] -verts[:,0])**2+(data['r'] - verts[:,1])**2)
-            # step the particles backward according to offset distance
-            #    in trajectory based on their velocity
-            for dim in ['x','r']:
-                data[dim] = data[dim]-data['v'+dim]/abs(data['v'+dim])*mm_offset
-            pts = MultiPoint(data[['x','r']])
-            verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
-        data['x'] = verts[:,0]
-        data['r'] = verts[:,1]
-        return(data)
-
     def calc_pe(self,mm_pt=10,x_rng = None,y_rng = None,param = 'v',
                         cores = multiprocessing.cpu_count()):
         from .particles import source
@@ -895,6 +874,48 @@ class simion:
         from scipy.interpolate import interp2d
         return(interp2d(self.v_data['x'],self.v_data['y'],
                         self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()))
+
+    def fix_stops(self,data,v_extrap = True):
+        # uses the shapely instrument geometry to set points on surface of polygon
+        #   to prevent pixlization collisions on reinitialization using collision locs
+        from shapely.geometry import MultiPoint
+        from shapely.ops import nearest_points
+        pol = self.geo.get_single_poly().boundary
+        pts = MultiPoint(data[['x','r']])
+        verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        if v_extrap:
+            #calc offset distance of point from surface
+            mm_offset = np.sqrt((data['x'] -verts[:,0])**2+(data['r'] - verts[:,1])**2)
+            # step the particles backward according to offset distance
+            #    in trajectory based on their velocity
+            for dim in ['x','r']:
+                data[dim] = data[dim]-data['v'+dim]/abs(data['v'+dim])*mm_offset
+            pts = MultiPoint(data[['x','r']])
+            verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        data['x'] = verts[:,0]
+        data['r'] = verts[:,1]
+        return(data)
+
+    def bounce(self,data,kind = 'reflect'):
+        def rel_angle(theta1,phi1,theta2,phi2):
+            t1 = theta1/90*np.pi/2
+            t2 = theta2/90*np.pi/2
+            p1 = phi1/90*np.pi/2
+            p2 = phi2/90*np.pi/2
+            return(180/np.pi*np.arccos(np.sin(t1)*np.sin(t2)+np.cos(t1)*np.cos(t2)*np.cos(p1-p2)))
+        
+        dat = data.copy()
+        norms = self.geo.get_normal(dat[['x','r']])+90
+        
+        if kind == 'reflect':
+            dat['theta'] = 180-(norms-rel_angle(dat['theta'],dat['phi'],norms,0))
+            # dat['phi'] = 0 180-(self.part['cs_el']-rel_ang)
+        elif kind == 'scatter':
+            dat['theta'] = norms+np.random.rand(len(dat['theta']))*180-90
+            dat['phi'] = np.random.rand(len(dat['theta']))*180-90
+            
+        return(self.fly(dat))
+
 
 
 def str_data_scrape(outs,n_parts,cores,quiet):

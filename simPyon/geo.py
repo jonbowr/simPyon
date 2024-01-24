@@ -209,7 +209,6 @@ class geo:
         pol = self.get_single_poly().buffer(buffer).boundary
         pts = MultiPoint(xy_pts)
         verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
-        return(verts)
         diff = verts-xy_pts
         return(np.arctan2(diff[:,1],diff[:,0])*180/np.pi)
 
