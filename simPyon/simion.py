@@ -76,6 +76,7 @@ class simion:
         self.home = home
         self.sim_cmd = r'simion.exe --nogui --noprompt --default-num-particles=1000000'
         self.slt_cmd = r'sltools --nogui'
+        self.log = []
         self.elec_num = []
         self.pa = []
         self.usr_prgm = ''
@@ -181,6 +182,14 @@ class simion:
             self.commands = r"pa2stl --in %s%s --numsectors %d" % (pm,pa_tag,numsectors)
             self.run(run_with='sl_tools')
 
+    def show_stl(self,pa=[],pa_tag = '0',numsectors = 90):
+        if not pa:
+            pa = list(self.pa)
+        for pm in pa:
+            self.commands = r"view --in %s%s" % (pm,pa_tag)
+            self.run(run_with='sl_tools')
+
+
     def refine(self,pa = []):
         '''
         Refines potential array self.pa from .pa# to simions potential array structure
@@ -194,7 +203,7 @@ class simion:
         m_gems = []
         for gm in self.gemfil:
             temp_gem = gm.replace('.'+gm.split('.')[-1],'_temp.'+gm.split('.')[-1])
-            print(temp_gem)
+            print('Refine:%s'%os.path.basename(temp_gem))
             with open(temp_gem,'w') as w:
                 for l in open(gm,'r').readlines():
                     lc = l.split(';')[0]
@@ -507,16 +516,15 @@ class simion:
             cmdr = str(self.slt_cmd)
 
         if quiet == False:
-            print(' ===============================================')
-            print('| Executing Simion Command:')
-            print(' ===============================================')
-            print(cmdr)
-            print(self.commands)
+            print('>%s'%cmdr)
+            print('%s'%self.commands)
+        cmd = cmdr + ' ' + self.commands
+        self.log.append(cmd)
         if quiet == True:
-            check = subprocess.Popen(cmdr + ' ' + self.commands,
+            check = subprocess.Popen(cmd,
                 stdout = subprocess.PIPE)
         else:
-            check = subprocess.Popen(cmdr + ' ' + self.commands)
+            check = subprocess.Popen(cmd)
         check.wait()
         check.kill()
         return check
@@ -981,11 +989,12 @@ def core_fly(sim,n_parts,cores,quiet,rec_fil = '',markers = 0,trajectory_quality
         loc_com += r" --particles=%s"%os.path.basename(ion_fil)
         loc_com += r" %s"%sim.bench
         sim.commands = loc_com
+        cmd = sim.sim_cmd+' '+sim.commands
         f = tmp.TemporaryFile()
-        check = subprocess.Popen(sim.sim_cmd+' '+sim.commands,
+        check = subprocess.Popen(cmd,
             stdout = f)
         checks.append((check,f))
-
+    sim.log.append(cmd)
     outs = []
     for check,f in checks:
         check.wait()
