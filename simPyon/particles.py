@@ -376,6 +376,24 @@ class auto_parts:
                     else:
                         drop +=1
             f_count +=1
+    
+    def source_to_splat(self):
+        from .data import sim_data
+        from pandas import DataFrame
+        self.sample()
+        df = DataFrame({lab:self[lab].dist_out for lab in ['tof','ke']})
+        df['azm'] = self['az'].dist_out
+        df['elv'] = self['el'].dist_out
+        df['charge'] = self['charge']
+        df['mass'] = self['mass']
+        df['x'] = self['pos'].dist_out[:,0]
+        df['y'] = self['pos'].dist_out[:,1]
+        df['z'] = 0
+        df['ion n'] = range(len(df))
+        df['vx'] = np.nan
+        df['vy'] = np.nan
+        df['vz'] = np.nan
+        return(sim_data(df))
 
     def splat_to_source(self,splat):
         # function which takes the simPyon.data.sim_data.df frame and input df components to source 

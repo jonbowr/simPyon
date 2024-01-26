@@ -28,12 +28,22 @@ class sim_data:
                         'TOF_MEASURE':bool(TOF_MEASURE),
                         'R_WEIGHT':float(R_WEIGHT)}):
 
-        if type(data) is np.ndarray:
-            self.header = headder
-            self.df = {}
-            for head, arr in zip(self.header, np.transpose(data)):
-                self.df[head.lower()] = arr
-            
+        if str(type(data)) == str(type(self)):
+            self.df = data.df.copy()
+            self.header = list(data.df.keys())
+            self.symmetry = str(data.symmetry)
+            self.mirror_ax = str(data.mirror_ax)
+            self.base_ax = str(data.base_ax)
+            self.obs = dict(data.obs)
+        else:
+            self.header = [h.lower() for h in headder]
+            if type(data) is np.ndarray:
+                self.df = DataFrame(data,columns = [h.lower() for h in headder])
+            elif type(data)==dict:
+                self.df = DataFrame(data)[self.header]
+            else:
+                self.df = data.copy()[self.header]
+
             base = {'x':'y','y':'x'}
             mirroring = mirroring.lower()
             symmetry = symmetry.lower()
@@ -46,10 +56,10 @@ class sim_data:
 
             if symmetry == 'cylindrical'\
                      or symmetry =='cyl':
-                ax_mir = self.df[mirroring]
-                vmir = self.df['v'+mirroring]
-                ax_base = self.df[base[mirroring]]
-                vbase = self.df['v'+base[mirroring]]
+                ax_mir = self.df[mirroring].values
+                vmir = self.df['v'+mirroring].values
+                ax_base = self.df[base[mirroring]].values
+                vbase = self.df['v'+base[mirroring]].values
                 #define the cylindrical symmetry coords
                 self.df['r'] = np.sqrt(self.df['z']**2 + ax_mir**2)
                 self.df['omega'] = np.arctan2(self.df['z'],ax_mir)
@@ -68,28 +78,17 @@ class sim_data:
                 # fix the count rate for increase in CS counts with radius
                 if obs['R_WEIGHT'] == True:
                     if len(data)!=0:
-                        starts = log_starts(self.df['ion n'])
-                        stops = log_stops(self.df['ion n'])
+                        starts = log_starts(self.df['ion n'].values)
+                        stops = log_stops(self.df['ion n'].values)
                         starty = min(self.df['r'][starts])
-                        cts = self.df['r'][starts] / starty
-                        self.df['counts'][starts] =  cts* len(ax_base[starts]) /\
+                        cts = self.df['r'][starts].values / starty
+                        all_cts = np.ones(len(ax_base))
+                        all_cts[starts] =  cts* len(ax_base[starts]) /\
                             np.sum(cts)
-                        self.df['counts'][stops] = self.df['counts'][starts]
-                self.df = DataFrame(self.df)
+                        if np.sum(stops)>0:
+                            all_cts[stops] = all_cts[starts]
+                        self.df['counts'] = all_cts
                 self.df['is_start'] = log_starts(self['ion n'])
-
-        elif str(type(data)) == str(type(self)):
-            self.header = list(data.df.keys())
-            if type(data)==dict:
-                self.df = {}
-                for head, arr in data.df.items():
-                    self.df[head.lower()] = arr
-            else:
-                self.df = data.df.copy()
-            self.symmetry = str(data.symmetry)
-            self.mirror_ax = str(data.mirror_ax)
-            self.base_ax = str(data.base_ax)
-            self.obs = dict(data.obs)
 
     def __call__(self):
         return(self.df)
