@@ -212,6 +212,15 @@ class geo:
         diff = verts-xy_pts
         return(np.arctan2(diff[:,1],diff[:,0])*180/np.pi)
 
+    def get_normal_vec(self,xy_pts,buffer = .05):
+        from shapely.geometry import MultiPoint
+        pol = self.get_single_poly().buffer(buffer).boundary
+        pts = MultiPoint(xy_pts)
+        verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        diff = verts-xy_pts
+        return(diff/np.sqrt((diff**2).sum(axis = 1)).reshape(-1,1))
+
+
     def ddraw(self,label = False):
         from matplotlib import cm
         fig,ax = pg.poly_draw(self.get_subgrouped_polys(),sub_cols = True,cmap = cm.viridis)

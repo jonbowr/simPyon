@@ -333,15 +333,16 @@ class simion:
         elif str(type(parts)) == str(auto_parts):
             if quiet==False:
                 print('Flying Distribution:\n%s'%str(parts))
+            source_hold = self.source.copy()
             self.source = auto_parts()
             self.source.df = parts.df.copy()
             n_parts = self.source['n']
         else:
             if quiet==False:
                 print('Flying vector:\n%s'%str(parts))
+            source_hold = self.source.copy()
             self.source.splat_to_source(parts)
             n_parts = self.source['n']
-
 
         start_time = time.time()
 
@@ -359,10 +360,12 @@ class simion:
                                     obs = self.obs_region)
         if quiet == False:
             print(time.time() - start_time)
+        if type(parts) != int:
+            self.source = source_hold
 
         return(self.data.copy())
 
-    def fly_trajectory(self,n_parts = 100,cores = multiprocessing.cpu_count(),
+    def fly_trajectory(self,n_parts = 100,parts = None,cores = multiprocessing.cpu_count(),
                       quiet = True, dat_step = 30,show= True,
                       fig = [],ax = [],cmap = 'eng',eng_cmap = cm.plasma,plt_kwargs = {},
                       show_cbar = True,label = '',xlim = [-np.inf,np.inf],plot_3d = False):
@@ -395,6 +398,22 @@ class simion:
                             self.home)
             # os.remove(self.home+'simPyon_traj.rec')
 
+        # parse particle input type 
+        new_parts = False
+        if str(type(parts)) == str(auto_parts):
+            if quiet==False:
+                print('Flying Distribution:\n%s'%str(parts))
+            source_hold = self.source.copy()
+            self.source = auto_parts()
+            self.source.df = parts.df.copy()
+            new_parts = True
+        elif str(type(parts)) == str(sim_data):
+            if quiet==False:
+                print('Flying vector:\n%s'%str(parts))
+            source_hold = self.source.copy()
+            self.source.splat_to_source(parts)
+            new_parts = True
+
         # Write the workbench program in 'usr_prgm'
         if self.bench:
             with open(self.bench.replace('iob','lua'),'w') as fil:
@@ -416,6 +435,8 @@ class simion:
         from pandas import DataFrame
         self.traj_data = DataFrame(data,columns = head)
         self.traj_data['r'] = np.sqrt(self.traj_data['z']**2+self.traj_data[self.pa_info[0]['mirroring']]**2)
+        if new_parts:
+            self.source = source_hold
 
         if show == True:
             if cmap == 'eng':
@@ -440,7 +461,6 @@ class simion:
                                                     norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
                                                                        vmax=np.nanmax(self.source['ke'].dist_out))),
                                             ax = ax,label = 'Ke [eV]',cax = cax)
-                return(fig,ax)
             else:
                 from stl import mesh
                 from mpl_toolkits.mplot3d import Axes3D,art3d
@@ -481,6 +501,7 @@ class simion:
                 # ax.set_xlim(0,200)
                 # ax.set_zlim(0,200)
                 # ax.set_ylim(-100,100)
+            return(fig,ax)
 
     def get_elec_nums_gem(self, gem_fil=[]):
         '''
@@ -883,48 +904,55 @@ class simion:
         return(interp2d(self.v_data['x'],self.v_data['y'],
                         self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()))
 
-    def fix_stops(self,data,v_extrap = True):
+    def fix_stops(self,data,v_extrap = True,buffer = .05,mm_offset = .05):
         # uses the shapely instrument geometry to set points on surface of polygon
         #   to prevent pixlization collisions on reinitialization using collision locs
+        #mm_offset: offset distance to stepback in velocity direction
         from shapely.geometry import MultiPoint
         from shapely.ops import nearest_points
-        pol = self.geo.get_single_poly().boundary
-        pts = MultiPoint(data[['x','r']])
-        verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        pol = self.geo.get_single_poly().buffer(buffer).boundary
+
         if v_extrap:
-            #calc offset distance of point from surface
-            mm_offset = np.sqrt((data['x'] -verts[:,0])**2+(data['r'] - verts[:,1])**2)
             # step the particles backward according to offset distance
             #    in trajectory based on their velocity
-            for dim in ['x','r']:
+            for dim in ['x','y','z']:
                 data[dim] = data[dim]-data['v'+dim]/abs(data['v'+dim])*mm_offset
+            data = sim_data(data.df)
+            pts = MultiPoint(data[['x','r']])
+            verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
+        else:         
             pts = MultiPoint(data[['x','r']])
             verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
         data['x'] = verts[:,0]
         data['r'] = verts[:,1]
         return(data)
 
-    def bounce(self,data,kind = 'reflect'):
-        def rel_angle(theta1,phi1,theta2,phi2):
-            t1 = theta1/90*np.pi/2
-            t2 = theta2/90*np.pi/2
-            p1 = phi1/90*np.pi/2
-            p2 = phi2/90*np.pi/2
-            return(180/np.pi*np.arccos(np.sin(t1)*np.sin(t2)+np.cos(t1)*np.cos(t2)*np.cos(p1-p2)))
-        
-        dat = data.copy()
-        norms = self.geo.get_normal(dat[['x','r']])+90
-        
+    def bounce(self,bounce_data = None,kind = 'reflect'):
+        if bounce_data is None:
+            data = self.data.stop()
+        else: 
+            data = bounce_data.copy()
+
         if kind == 'reflect':
-            dat['theta'] = 180-(norms-rel_angle(dat['theta'],dat['phi'],norms,0))
-            # dat['phi'] = 0 180-(self.part['cs_el']-rel_ang)
-        elif kind == 'scatter':
+            def reflect(dat,geo):
+                dn = geo.get_normal_vec(dat[['x','r']])
+                def flip90(x,y):
+                    return(np.stack([-y,x]).T)
+                v2 = flip90(*dn.T)
+                v1 = dat[['vx','vr']]
+                k = (v1*v2).sum(axis = 1).reshape(-1,1)
+                vxy =-v1+2*k*v2
+                dats = dat.df.copy()
+                dats['vx'] = vxy[:,0]
+                dats['vy'] = vxy[:,1]
+                return(self.fix_stops(sim_data(dats)))
+            dat = reflect(data,self.geo)
+        elif kind == 'Surf Emmit':
+            dat = self.fix_stops(data)
+            norms = self.geo.get_normal(dat[['x','r']])+90
             dat['theta'] = norms+np.random.rand(len(dat['theta']))*180-90
             dat['phi'] = np.random.rand(len(dat['theta']))*180-90
-            
-        return(self.fly(dat))
-
-
+        return(dat)
 
 def str_data_scrape(outs,n_parts,cores,quiet):
     tot_lines = []
