@@ -395,15 +395,23 @@ class auto_parts:
         df['vz'] = np.nan
         return(sim_data(df))
 
-    def splat_to_source(self,splat):
+    def splat_to_source(self,splat, kind = 'fixed_vector'):
         # function which takes the simPyon.data.sim_data.df frame and input df components to source 
         # components, assumes cilidrical coords to r,phi,theta to y,az,el
-        self.df['ke'] = source('fixed_vector',dist_vals = {'vector':splat['ke']})
-        self.df['az'] = source('fixed_vector',dist_vals = {'vector':splat['phi']})
-        self.df['el'] = source('fixed_vector',dist_vals = {'vector':splat['theta']})
-        self.df['pos'] = source('fixed_vector',dist_vals = {'vector':np.stack([splat['x'],splat['r']]).T})
-        self.df['n'] = len(splat['ke'])
-        self.df['tof'] = source('fixed_vector',dist_vals = {'vector':splat['tof']})
+        if kind == 'fixed_vector':
+            self.df['ke'] = source('fixed_vector',dist_vals = {'vector':splat['ke']})
+            self.df['az'] = source('fixed_vector',dist_vals = {'vector':splat['phi']})
+            self.df['el'] = source('fixed_vector',dist_vals = {'vector':splat['theta']})
+            self.df['pos'] = source('fixed_vector',dist_vals = {'vector':np.stack([splat['x'],splat['r']]).T})
+            self.df['n'] = len(splat['ke'])
+            self.df['tof'] = source('fixed_vector',dist_vals = {'vector':splat['tof']})
+        elif kind == 'coupled_vector':
+            self.df['ke'] = source('sample_vector',dist_vals = {'vector':splat['ke']})
+            self.df['az'] = source('coupled_vector',dist_vals = {'vector':splat['phi'],'parent':self.df['ke'],'type':'child'})
+            self.df['el'] = source('coupled_vector',dist_vals = {'vector':splat['theta'],'parent':self.df['ke'],'type':'child'})
+            self.df['pos'] = source('coupled_vector',dist_vals = {'vector':np.stack([splat['x'],splat['r']]).T,'parent':self.df['ke'],'type':'child'})
+            self.df['n'] = len(splat['ke'])
+            self.df['tof'] = source('coupled_vector',dist_vals = {'vector':splat['tof'],'parent':self.df['ke'],'type':'child'})
 
     def copy(self):
         thing = auto_parts()
