@@ -360,12 +360,12 @@ class simion:
                                     obs = self.obs_region)
         if quiet == False:
             print(time.time() - start_time)
-        if type(parts) != int:
-            self.source = source_hold
+        # if type(parts) != int:
+        #     self.source = source_hold
 
         return(self.data.copy())
 
-    def fly_trajectory(self,n_parts = 100,parts = None,cores = multiprocessing.cpu_count(),
+    def fly_trajectory(self,parts = None,cores = multiprocessing.cpu_count(),
                       quiet = True, dat_step = 30,show= True,
                       fig = [],ax = [],cmap = 'eng',eng_cmap = cm.plasma,plt_kwargs = {},
                       show_cbar = True,label = '',xlim = [-np.inf,np.inf],plot_3d = False):
@@ -400,18 +400,23 @@ class simion:
 
         # parse particle input type 
         new_parts = False
-        if str(type(parts)) == str(auto_parts):
+
+        if type(parts) == int:
+            n_parts = parts
+        elif str(type(parts)) == str(auto_parts):
             if quiet==False:
                 print('Flying Distribution:\n%s'%str(parts))
             source_hold = self.source.copy()
             self.source = auto_parts()
             self.source.df = parts.df.copy()
+            n_parts = self.source['n']
             new_parts = True
-        elif str(type(parts)) == str(sim_data):
+        else:
             if quiet==False:
                 print('Flying vector:\n%s'%str(parts))
             source_hold = self.source.copy()
             self.source.splat_to_source(parts)
+            n_parts = self.source['n']
             new_parts = True
 
         # Write the workbench program in 'usr_prgm'
@@ -904,7 +909,7 @@ class simion:
         return(interp2d(self.v_data['x'],self.v_data['y'],
                         self.v_data[param].reshape(-1,len(self.v_data['x'])).copy()))
 
-    def fix_stops(self,data,v_extrap = True,buffer = .05,mm_offset = .05):
+    def fix_stops(self,data,v_extrap = True,buffer = .025,mm_offset = .025):
         # uses the shapely instrument geometry to set points on surface of polygon
         #   to prevent pixlization collisions on reinitialization using collision locs
         #mm_offset: offset distance to stepback in velocity direction

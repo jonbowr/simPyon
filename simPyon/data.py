@@ -103,7 +103,7 @@ class sim_data:
             return(self.df[item])
 
     def __str__(self):
-        return(repr(self))
+        return(str(type(self)))
 
     def __repr__(self):
         return(str(type(self))+
