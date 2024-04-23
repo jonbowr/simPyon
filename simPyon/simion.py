@@ -66,11 +66,12 @@ class simion:
                  recfil = '',
                  traj_recfil = '',
                  bench = '',
-                 pa = '',
+                 pa = None,
                  obs_region = {'X_MAX':X_MAX,'X_MIN':X_MIN,
                         'R_MAX':R_MAX,'R_MIN':R_MIN,
                         'TOF_MEASURE':TOF_MEASURE,
-                        'R_WEIGHT':R_WEIGHT}
+                        'R_WEIGHT':R_WEIGHT},
+                 pa_info = {'pa_offset_position': {}}
                  ):
         self.commands = []
         self.home = home
@@ -79,6 +80,7 @@ class simion:
         self.log = []
         self.elec_num = []
         self.pa = []
+        self.pa_src = []
         self.usr_prgm = ''
         self.elect_dict = {}
         self.volt_dict = volt_dict
@@ -98,28 +100,13 @@ class simion:
                 for file in files:
                     if file.lower().endswith(".gem"):
                         self.gemfil.append(os.path.join(root,file))
-        elif  type(gemfil) == list: 
+        elif  type(gemfil) is list: 
             self.gemfil = []
             for gm in gemfil:
                 self.gemfil.append(os.path.join(home,gm))
-        elif type(gemfil) == str:
+        elif type(gemfil) is str:
             self.gemfil = [os.path.join(home,gemfil)]
 
-
-        # Grab workbench, potential arrays and gemfiles from current directory
-        # self.bench = ''
-        if bench == '':
-            self.bench = os.path.join(home,'simPyon_bench.iob')
-            copy("%s/bench/simPyon_bench_%d.iob"%(\
-                            os.path.dirname(os.path.dirname(__file__)+'..'),
-                            len(self.gemfil)),
-                            self.bench)
-        else:
-            Warning("SimPyon updated to work best with default workbench file")
-            self.bench = os.path.join(home,bench)
-
-        # Assign pa numbers associated with the number of gemfile electrodes
-        self.pa = [os.path.join(home,'simPyon%d.pa'%pan) for pan in range(len(self.gemfil))]
 
         self.name = self.gemfil[0].upper().strip('.GEM')
         #scrape the gemfile for numbers
@@ -130,11 +117,41 @@ class simion:
             self.gem_nums.append(gem.get_elec_nums_gem(gm)[0])
             self.pa_info.append(gem.get_pa_info(gm))
                 
-        self.setup_usr_program()
+        # Assign pa numbers associated with the number of gemfile electrodes
+        self.pa = [os.path.join(home,'simPyon%d.pa'%pan) for pan in range(len(self.gemfil))]
+
+        # append pa with user provided pas 
+        if pa is not None:
+            import shutil
+            if  type(pa) is list:
+                for p in pa:
+                    src = os.path.join(home,p)
+                    new_fil =os.path.join(home,'simPyon%d.pa'%(len(self.pa)))
+                    self.pa_src.append(src)
+                    self.pa.append(new_fil)
+                    mod = p.split('.')[1]
+                    shutil.copy(src,new_fil.replace('.pa','.'+mod))
+            # elif type(pa) is str:
+            #         self.pa_src.append(os.path.join(home,p))
+            #         self.pa.append(os.path.join(home,'simPyon%d.pa'%len(self.pa+1)))
+
+            self.pa_info.append(pa_info)
 
         self.geo = geo(self.gemfil)
         self.params = {'volts':self.volt_dict}
 
+        # self.bench = ''
+        if bench == '':
+            self.bench = os.path.join(home,'simPyon_bench.iob')
+            copy("%s/bench/simPyon_bench_%d.iob"%(\
+                            os.path.dirname(os.path.dirname(__file__)+'..'),
+                            len(self.pa)),
+                            self.bench)
+        else:
+            Warning("SimPyon updated to work best with default workbench file")
+            self.bench = os.path.join(home,bench)
+
+        self.setup_usr_program()
 
     def __repr__(self):
         return('%s \n'%str(type(self))+
@@ -157,20 +174,20 @@ class simion:
         elif type(gemfil) == str:
             gemfil = [gemfil]
 
-        if not pa:
+        if pa is None:
             pa = self.pa
-
-        if pa == 'split':
+        elif pa == 'split':
             pa = []
             for i in range(len(gemfil)):
                 if i >0:
                     pa.append(self.pa[0].replace('.pa','_%d.pa'%i))
                 else:
                     pa.append(self.pa[0])
+            self.pa = pa
         elif type(pa) != list:
             pa = [pa]
-
-        self.pa = pa
+            self.pa = pa
+        
         for gm,pm in zip(gemfil,pa):
             self.commands = r"gem2pa %s %s%s" % (gm, pm,pa_tag)
             self.run()
@@ -494,8 +511,9 @@ class simion:
                 figure = plt.figure()
                 figure.set_size_inches(8,8)
                 ax = figure.add_subplot(111,projection = '3d')
-                for pa,info in zip(self.pa,self.pa_info):
-                    thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
+
+                # for pa,info in zip(self.pa,self.pa_info):
+                    # thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
                 # axes.set_xlim(0,300)
                 def traj_pltr_3d(traj):
                     if cmap == 'eng':
@@ -725,7 +743,7 @@ class simion:
         self.usr_prgm+='\nfunction segment.load() \n'
         for pai in self.pa_info:
             if 'pa_offset_position' in pai:
-                for d,v in zip(['x','y','z'],pai['pa_offset_position']):
+                for d,v in pai['pa_offset_position'].items():
                     self.usr_prgm+='simion.wb.instances[%d].%s = %f\n'%(pa,d,v)
             pa +=1
         self.usr_prgm+='end \n'
@@ -939,19 +957,7 @@ class simion:
             data = bounce_data.copy()
 
         if kind == 'reflect':
-            def reflect(dat,geo):
-                dn = geo.get_normal_vec(dat[['x','r']])
-                def flip90(x,y):
-                    return(np.stack([-y,x]).T)
-                v2 = flip90(*dn.T)
-                v1 = dat[['vx','vr']]
-                k = (v1*v2).sum(axis = 1).reshape(-1,1)
-                vxy =-v1+2*k*v2
-                dats = dat.df.copy()
-                dats['vx'] = vxy[:,0]
-                dats['vy'] = vxy[:,1]
-                return(self.fix_stops(sim_data(dats)))
-            dat = reflect(data,self.geo)
+            dat = self.fix_stops(sim_data(self.geo.reflect(data)))
         elif kind == 'Surf Emmit':
             dat = self.fix_stops(data)
             norms = self.geo.get_normal(dat[['x','r']])+90

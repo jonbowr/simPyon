@@ -38,6 +38,7 @@ def get_canvas(gem_file):
     return(canvas_size,pxls_mm)
 
 def get_pa_info(gem_file):
+    import pandas as pd
     with open(gem_file) as lines:
         file_lines = lines.readlines()
 
@@ -68,14 +69,14 @@ def get_pa_info(gem_file):
                            'mirroring': info[4].strip()[0].lower(),
                            'base':('y' if info[4].strip()[0].lower() == 'x' else 'x'),
                            'pxls_mm':float(info[7]),
-                           'pa_offset_position':np.zeros(3)
+                           'pa_offset_position':pd.Series(np.zeros(3),index = ['x','y','z'])
                            }
             break
 
     for line in file_lines: 
         if 'SET_PA_LOCATION' in line:
             pa_loc = [float(val) for val in within(line,'[',']').split(',')]
-            canvas_info['pa_offset_position'] = np.array(pa_loc)
+            canvas_info['pa_offset_position'][:] = np.array(pa_loc)
     return(canvas_info)
 
 def grow_line(line,fig,ax, d = .2,pts_mm = 5,edge_buff = .2):

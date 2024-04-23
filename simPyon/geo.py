@@ -221,6 +221,19 @@ class geo:
         return(diff/np.sqrt((diff**2).sum(axis = 1)).reshape(-1,1))
 
 
+    def reflect(self,dat):
+        dn = self.get_normal_vec(dat[['x','r']])
+        def flip90(x,y):
+            return(np.stack([-y,x]).T)
+        v2 = flip90(*dn.T)
+        v1 = dat[['vx','vr']]
+        k = (v1*v2).sum(axis = 1).reshape(-1,1)
+        vxy =-v1+2*k*v2
+        dats = dat.df.copy()
+        dats['vx'] = vxy[:,0]
+        dats['vy'] = vxy[:,1]
+        return(dats)
+
     def ddraw(self,label = False):
         from matplotlib import cm
         fig,ax = pg.poly_draw(self.get_subgrouped_polys(),sub_cols = True,cmap = cm.viridis)
