@@ -172,7 +172,7 @@ class sim_data:
 
     def throughput(self,weights = True):
         if weights:
-            return(np.sum(self.good().start().df['counts'])/\
+            return(np.sum(self.good().stop().df['counts'])/\
                 np.sum(self.start().df['counts']))
         else:
             return(len(self.good().start())/\
