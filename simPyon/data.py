@@ -16,7 +16,7 @@ def log_stops(ion_num):
 
 class sim_data:
 
-    def __init__(self, data,
+    def __init__(self, data=None,
                  headder = ["Ion N","TOF","X","Y","Z",
                             "Azm","Elv","Vx","Vy","Vz","KE"],
                  symmetry='cylindrical',
@@ -27,8 +27,15 @@ class sim_data:
                         'R_MIN':float(R_MIN),
                         'TOF_MEASURE':bool(TOF_MEASURE),
                         'R_WEIGHT':float(R_WEIGHT)}):
-
-        if str(type(data)) == str(type(self)):
+        if data is None:
+            self.df = DataFrame(columns = headder)
+            base = {'x':'y','y':'x'}
+            self.symmetry = symmetry.lower()
+            self.mirror_ax = mirroring.lower()
+            self.base_ax = base[self.mirror_ax]
+            # load the detection parameters From defaults so they can be actively updated
+            self.obs = dict(obs)
+        elif str(type(data)) == str(type(self)):
             self.df = data.df.copy()
             self.header = list(data.df.keys())
             self.symmetry = str(data.symmetry)
@@ -45,21 +52,19 @@ class sim_data:
                 self.df = data.copy()[self.header]
 
             base = {'x':'y','y':'x'}
-            mirroring = mirroring.lower()
-            symmetry = symmetry.lower()
-            self.symmetry = symmetry
-            self.mirror_ax = mirroring
-            self.base_ax = base[mirroring]
+            self.symmetry = symmetry.lower()
+            self.mirror_ax = mirroring.lower()
+            self.base_ax = base[self.mirror_ax]
 
             # load the detection parameters From defaults so they can be actively updated
-            self.obs = obs
+            self.obs = dict(obs)
 
-            if symmetry == 'cylindrical'\
-                     or symmetry =='cyl':
-                ax_mir = self.df[mirroring].values
-                vmir = self.df['v'+mirroring].values
-                ax_base = self.df[base[mirroring]].values
-                vbase = self.df['v'+base[mirroring]].values
+            if self.symmetry == 'cylindrical'\
+                     or self.symmetry =='cyl':
+                ax_mir = self.df[self.mirror_ax].values
+                vmir = self.df['v'+self.mirror_ax].values
+                ax_base = self.df[base[self.mirror_ax]].values
+                vbase = self.df['v'+base[self.mirror_ax]].values
                 #define the cylindrical symmetry coords
                 self.df['r'] = np.sqrt(self.df['z']**2 + ax_mir**2)
                 self.df['omega'] = np.arctan2(self.df['z'],ax_mir)
@@ -94,7 +99,8 @@ class sim_data:
         return(self.df)
 
     def __iter__(self):
-        return(iter(self.df.keys()))
+        return()
+        # return(iter(self.df.keys()))
 
     def __getitem__(self,item):
         if type(self.df)==DataFrame:
@@ -102,13 +108,13 @@ class sim_data:
         elif type(self.df)==dict:
             return(self.df[item])
 
-    def __str__(self):
-        return(str(type(self)))
-
     def __repr__(self):
         return(str(type(self))+
                '\n Size:%s'%str(self.df.shape)+
                '\n Obs Region %s'%str(self.obs))
+
+    def __str__(self):
+        return('%s:%s'%(str(type(self)),str(self.df.shape)))
 
     def __setitem__(self,item,value):
         self.df[item] = value
