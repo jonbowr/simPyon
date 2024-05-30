@@ -174,19 +174,6 @@ class geo:
                 g_lines.append(np.concatenate([xy,v],axis = 1))
         return(g_lines)
 
-    def get_total_verts_3d(self):
-        from shapely.geometry.multilinestring import MultiLineString as ms
-        from shapely.geometry.linestring import LineString as ls
-        g_lines = []
-        gpolys = self.get_grouped_polys()
-        for num,g in gpolys.items():
-            bounds = g.boundary
-            for b in bounds:
-                xy = np.array(b.xy).T
-                v = np.array([num]*len(xy)).reshape(-1,1)
-                g_lines.append(np.concatenate([xy,v],axis = 1))
-        return(g_lines)
-
     def get_labels(self):
         # if gem_fil == []:
         for gem_fil in self.gemfil:
@@ -219,7 +206,6 @@ class geo:
         verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
         diff = verts-xy_pts
         return(diff/np.sqrt((diff**2).sum(axis = 1)).reshape(-1,1))
-
 
     def reflect(self,dat):
         dn = self.get_normal_vec(dat[['x','r']])

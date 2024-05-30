@@ -93,6 +93,7 @@ class simion:
         self.scale_exclude = []
         self.obs_region = obs_region
         self.type = 'simion'
+        self.interpolator = None
 
         if gemfil =='':
             self.gemfil = []
@@ -331,55 +332,49 @@ class simion:
             instances is printed to cmd. 
         '''
 
-
-        # copy rec file to home directory if none already exists
-        if self.recfil == '':
-            self.recfil = os.path.join(self.home,'simPyon_base.rec')
-            copy("%s/rec/simPyon_base.rec"%\
-                            os.path.dirname(os.path.dirname(__file__)+'..'),
-                            self.recfil)
-
-        # Write the workbench program in 'usr_prgm'
-        # if self.bench:
-        #     with open(self.bench.replace('iob','lua'),'w') as fil:
-        #         fil.write(self.usr_prgm)
-
-        # Parse particle input type
-        if type(parts) == int:
-            n_parts = parts
-        elif str(type(parts)) == str(auto_parts):
-            if quiet==False:
-                print('Flying Distribution:\n%s'%str(parts))
-            source_hold = self.source.copy()
-            self.source = auto_parts()
-            self.source.df = parts.df.copy()
-            n_parts = self.source['n']
+        if self.interpolator is not None and type(parts) is sim_data:
+            self.data = self.interpolator.fly(parts)
         else:
-            if quiet==False:
-                print('Flying vector:\n%s'%str(parts))
-            source_hold = self.source.copy()
-            self.source.splat_to_source(parts)
-            n_parts = self.source['n']
+            # copy rec file to home directory if none already exists
+            if self.recfil == '':
+                self.recfil = os.path.join(self.home,'simPyon_base.rec')
+                copy("%s/rec/simPyon_base.rec"%\
+                                os.path.dirname(os.path.dirname(__file__)+'..'),
+                                self.recfil)
 
-        start_time = time.time()
+            # Parse particle input type
+            if type(parts) == int:
+                n_parts = parts
+            elif str(type(parts)) == str(auto_parts):
+                if quiet==False:
+                    print('Flying Distribution:\n%s'%str(parts))
+                source_hold = self.source.copy()
+                self.source = auto_parts()
+                self.source.df = parts.df.copy()
+                n_parts = self.source['n']
+            else:
+                if quiet==False:
+                    print('Flying vector:\n%s'%str(parts))
+                source_hold = self.source.copy()
+                self.source.splat_to_source(parts)
+                n_parts = self.source['n']
 
-        if quiet == False:
-            print(' ===============================================')
-            print('| Begining Next Fly\'em:')
-            print('| %d Particles on %d Cores'%(n_parts,cores))
-            print(' ===============================================')
-        # Fly the particles in parallel and scrape the resulting data from the shell
-        outs = core_fly(self,n_parts,cores,quiet,
-                        trajectory_quality =self.trajectory_quality)
-        data = str_data_scrape(outs,n_parts,cores,quiet)
-        self.data = sim_data(data,symmetry = self.pa_info[0]['symmetry'],
-                                    mirroring = self.pa_info[0]['mirroring'],
-                                    obs = self.obs_region)
-        if quiet == False:
-            print(time.time() - start_time)
-        # if type(parts) != int:
-        #     self.source = source_hold
+            start_time = time.time()
 
+            if quiet == False:
+                print(' ===============================================')
+                print('| Begining Next Fly\'em:')
+                print('| %d Particles on %d Cores'%(n_parts,cores))
+                print(' ===============================================')
+            # Fly the particles in parallel and scrape the resulting data from the shell
+            outs = core_fly(self,n_parts,cores,quiet,
+                            trajectory_quality =self.trajectory_quality)
+            data = str_data_scrape(outs,n_parts,cores,quiet)
+            self.data = sim_data(data,symmetry = self.pa_info[0]['symmetry'],
+                                        mirroring = self.pa_info[0]['mirroring'],
+                                        obs = self.obs_region)
+            if quiet == False:
+                print(time.time() - start_time)
         return(self.data.copy())
 
     def fly_trajectory(self,parts = None,cores = multiprocessing.cpu_count(),
@@ -461,70 +456,43 @@ class simion:
             self.source = source_hold
 
         if show == True:
-            if cmap == 'eng':
-                from matplotlib import cm
-                from mpl_toolkits.axes_grid1 import make_axes_locatable
-            if plot_3d==False:
-                if not ax:
-                    fig,ax = self.show()
-                # else:
-                #     self.show(fig = fig,ax = ax)
-                # for traj in self.traj_data:
-                def traj_pltr(traj):
-                    if cmap == 'eng':
-                        plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
-                    ax.plot(traj[self.pa_info[0]['base']],traj['r'],markevery = [-1],marker='.',markerfacecolor='k',**plt_kwargs)
-                self.traj_data.groupby('n').apply(traj_pltr)
-                # ax.plot(traj[self.pa_info[0]['base']],traj['r'],label = label)
-                if cmap == 'eng' and show_cbar == True:
-                    divider = make_axes_locatable(ax)
-                    cax = divider.append_axes("right", size="5%", pad=0.05)
-                    cbar = plt.colorbar(plt.cm.ScalarMappable(cmap=eng_cmap, 
-                                                    norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
-                                                                       vmax=np.nanmax(self.source['ke'].dist_out))),
-                                            ax = ax,label = 'Ke [eV]',cax = cax)
-            else:
-                from stl import mesh
-                from mpl_toolkits.mplot3d import Axes3D,art3d
-                from matplotlib.colors import LightSource
+            return(self.show_trajectory(fig,ax,cmap,eng_cmap,plt_kwargs,
+                      show_cbar,label,xlim,plot_3d))
 
-                def view_stl(stl,figure = [],axes = [],origin = np.zeros(3),col = 'r'):
-                    your_mesh = mesh.Mesh.from_file(stl)
-                    for shift,dim in zip(origin,[your_mesh.x,your_mesh.y,your_mesh.z]):
-                        dim+=shift
-                    if not axes:
-                        figure = plt.figure()
-                        axes = figure.add_subplot(111,projection = '3d')
-                    d_thing = art3d.Poly3DCollection(your_mesh.vectors[your_mesh.vectors[:,2,1]>0],
-                                                                     lightsource = LightSource(),
-                                                                         shade = True,edgecolors = [col],
-                                                                 facecolors = [col],
-                                                                    capstyle = 'butt')
-                    d_thing.set_antialiased(True)
-                    axes.add_collection3d(d_thing)
+    def show_trajectory(self,
+                      fig = [],ax = [],cmap = 'eng',eng_cmap = cm.plasma,plt_kwargs = {},
+                      show_cbar = True,label = '',xlim = [-np.inf,np.inf],plot_3d = False):
+        if cmap == 'eng':
+            from matplotlib import cm
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+        if plot_3d==False:
+            if not ax:
+                fig,ax = self.show()
+            # else:
+            #     self.show(fig = fig,ax = ax)
+            # for traj in self.traj_data:
+            def traj_pltr(traj):
+                if cmap == 'eng':
+                    plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
+                return(ax.plot(traj[self.pa_info[0]['base']],traj['r'],markevery = [-1],marker='.',markerfacecolor='k',**plt_kwargs))
+            art_lines = self.traj_data.groupby('n').apply(traj_pltr)
 
-                    # Auto scale to the mesh size
-                    scale = your_mesh.points.flatten()
-                    axes.auto_scale_xyz(scale, scale, scale)
-                    return(d_thing)
-                
-                figure = plt.figure()
-                figure.set_size_inches(8,8)
-                ax = figure.add_subplot(111,projection = '3d')
-
-                # for pa,info in zip(self.pa,self.pa_info):
-                    # thing = view_stl(pa.replace('.pa','.stl'),figure= figure,axes = ax,origin = info['pa_offset_position'])
-                # axes.set_xlim(0,300)
-                def traj_pltr_3d(traj):
-                    if cmap == 'eng':
-                        plt_kwargs['color'] = eng_cmap(traj['ke'].values[0]/np.max(self.source['ke'].dist_out))
-                    ax.plot(traj['x'],traj['y'],traj['z'],**plt_kwargs)
-                self.traj_data.groupby('n').apply(traj_pltr_3d)
-                ax.view_init(30, -70)
-                # ax.set_xlim(0,200)
-                # ax.set_zlim(0,200)
-                # ax.set_ylim(-100,100)
-            return(fig,ax)
+            if label != '':
+                art_lines[1][0].set_label(label)
+            if cmap == 'eng' and show_cbar == True:
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+                cbar = plt.colorbar(plt.cm.ScalarMappable(cmap=eng_cmap, 
+                                                norm=plt.Normalize(vmin=np.nanmin(self.source['ke'].dist_out), 
+                                                                   vmax=np.nanmax(self.source['ke'].dist_out))),
+                                        ax = ax,label = 'Ke [eV]',cax = cax)
+        else:
+            from . import geo3D
+            shapes = geo3D.sim_shapes3D(self)
+            shapes+=geo3D.sim_traj3D_shapes(self,cmap = eng_cmap,eng_cmap = True)
+            fig = geo3D.show_shapes3D(shapes)
+            return(fig)
+        return(fig,ax)
 
     def get_elec_nums_gem(self, gem_fil=[]):
         '''
