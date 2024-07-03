@@ -914,7 +914,7 @@ class simion:
             #    in trajectory based on their velocity
             for dim in ['x','y','z']:
                 data[dim] = data[dim]-data['v'+dim]/abs(data['v'+dim])*mm_offset
-            data = sim_data(data.df)
+            data = data.copy()
             pts = MultiPoint(data[['x','r']])
             verts = np.array([[pr.x,pr.y] for pr in [nearest_points(pol,pt)[0] for pt in pts.geoms]])
         else:         
