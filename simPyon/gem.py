@@ -66,7 +66,7 @@ def get_pa_info(gem_file):
                            'Ly':int(info[1]),
                            'Lz':int(info[2]),
                            'symmetry':info[3].strip().lower(),
-                           'mirroring': info[4].strip()[0].lower(),
+                           'mirroring': (info[4].strip().lower()[0] if info[4].strip().lower() != 'none' else 'y'),
                            'base':('y' if info[4].strip()[0].lower() == 'x' else 'x'),
                            'pxls_mm':float(info[7]),
                            'pa_offset_position':pd.Series(np.zeros(3),index = ['x','y','z'])

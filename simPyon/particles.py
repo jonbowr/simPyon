@@ -266,8 +266,8 @@ class source:
         self.f = func_dict[self.dist_type]
         self.dist_out =  None
         if dist_vals == {}:
-            self.dist_vals = func_defaults[self.dist_type]
-        elif all(list(name in func_defaults[self.dist_type] for name in dist_vals)) or dist_type == 'new':
+            self.dist_vals = dict(func_defaults[self.dist_type])
+        elif all(list(name in dict(func_defaults[self.dist_type]) for name in dist_vals)) or dist_type == 'new':
             self.dist_vals = dist_vals
         else:
             print('WARNING: dist_vals provided not supported')
@@ -292,6 +292,7 @@ class source:
 
     def __setitem__(self,item,value):
         self.dist_vals[item] = value
+
 
 class auto_parts:
     

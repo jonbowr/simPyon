@@ -59,6 +59,7 @@ class sim_data:
             # load the detection parameters From defaults so they can be actively updated
             self.obs = dict(obs)
 
+            self.df['counts'] = 1
             if self.symmetry == 'cylindrical'\
                      or self.symmetry =='cyl':
                 ax_mir = self.df[self.mirror_ax].values
@@ -79,7 +80,6 @@ class sim_data:
                 self.df['theta'] = np.arctan2(vr,np.sqrt(vbase**2+self.df['vtheta']**2))*180/np.pi
                 self.df['phi'] = np.arctan2(vtheta,vbase)*180/np.pi
 
-                self.df['counts'] = np.ones(len(ax_base))
                 # fix the count rate for increase in CS counts with radius
                 if obs['R_WEIGHT'] == True:
                     if len(data)!=0:
@@ -94,6 +94,16 @@ class sim_data:
                             all_cts[stops] = all_cts[starts]
                         self.df['counts'] = all_cts
                 self.df['is_start'] = log_starts(self['ion n'])
+
+            else:
+                # boot strappping so the other functions work when not in cylindrical
+
+                self.df['r'] = self.df[self.mirror_ax].copy()
+                self.df['vr'] = self.df['v'+self.mirror_ax].copy()
+                self.df['theta'] = self.df['elv'].copy()
+                self.df['phi'] = self.df['azm'].copy()
+
+
 
     def __call__(self):
         return(self.df)

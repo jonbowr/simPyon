@@ -494,6 +494,12 @@ class simion:
             return(fig)
         return(fig,ax)
 
+    def show_3d(self,cmap = 'eng',eng_cmap = cm.plasma):
+        from . import geo3D
+        shapes = geo3D.sim_shapes3D(self)
+        fig = geo3D.show_shapes3D(shapes)
+        return(fig)
+
     def get_elec_nums_gem(self, gem_fil=[]):
         '''
         Get the electrode numbers and names from a gemfile and store them in 

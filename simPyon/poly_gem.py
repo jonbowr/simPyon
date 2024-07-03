@@ -97,7 +97,10 @@ def get_verts(gemfil,clip_canvas = True):
                                     vert_split=  poly.split('(')
                                     nam = vert_split[0]
                                     verts = np.fromstring(vert_split[1],sep = ',')
-                                    verts = (verts.reshape(-1,2)+locate[:2]).flatten()
+                                    if nam != 'circle':
+                                        verts = (verts.reshape(-1,2)+locate[:2]).flatten()
+                                    else:
+                                        verts[:2] = verts[:2]+locate[:2]
                                     sep_poly['shape'].append(nam)
                                     sep_poly['verts'].append(verts)
                             if clip_canvas:
