@@ -95,6 +95,15 @@ class simion:
         self.type = 'simion'
         self.interpolator = None
 
+        import shutil
+
+        def gem_checker(gemfil,home):
+            if os.path.exists(gm):
+                fil = gm
+            else:
+                fil = os.path.join(home,gm)
+            return(fil)
+
         if gemfil =='':
             self.gemfil = []
             for root,dirs,files in os.walk(home):
@@ -104,10 +113,9 @@ class simion:
         elif  type(gemfil) is list: 
             self.gemfil = []
             for gm in gemfil:
-                self.gemfil.append(os.path.join(home,gm))
+                self.gemfil.append(gem_checker(gm,home))
         elif type(gemfil) is str:
-            self.gemfil = [os.path.join(home,gemfil)]
-
+            self.gemfil = [gem_checker(gemfil,home)]
 
         self.name = self.gemfil[0].upper().strip('.GEM')
         #scrape the gemfile for numbers
@@ -123,7 +131,6 @@ class simion:
 
         # append pa with user provided pas 
         if pa is not None:
-            import shutil
             if  type(pa) is list:
                 for p in pa:
                     src = os.path.join(home,p)
@@ -170,6 +177,7 @@ class simion:
         pa: string
             name of newly generated .pa# potential array file
         '''
+        import shutil
         if not gemfil:
             gemfil = self.gemfil
         elif type(gemfil) == str:
@@ -190,7 +198,10 @@ class simion:
             self.pa = pa
         
         for gm,pm in zip(gemfil,pa):
-            self.commands = r"gem2pa %s %s%s" % (gm, pm,pa_tag)
+            m_gem = pm.replace('.pa','.GEM')
+            print('Converting: %s'%gm)
+            shutil.copy(gm,m_gem)
+            self.commands = r"gem2pa %s %s%s" % (m_gem, pm,pa_tag)
             self.run()
 
     def pa2stl(self,pa=[],pa_tag = '0',numsectors = 90):
@@ -451,7 +462,11 @@ class simion:
 
         from pandas import DataFrame
         self.traj_data = DataFrame(data,columns = head)
-        self.traj_data['r'] = np.sqrt(self.traj_data['z']**2+self.traj_data[self.pa_info[0]['mirroring']]**2)
+        if self.pa_info[0]['symmetry']!='planar':
+            self.traj_data['r'] = np.sqrt(self.traj_data['z']**2+self.traj_data[self.pa_info[0]['mirroring']]**2)
+        else:
+            self.traj_data['r'] = self.traj_data[self.pa_info[0]['mirroring']]
+        
         if new_parts:
             self.source = source_hold
 

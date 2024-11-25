@@ -33,6 +33,7 @@ class sim_data:
             self.symmetry = symmetry.lower()
             self.mirror_ax = mirroring.lower()
             self.base_ax = base[self.mirror_ax]
+            self.free_ax = 'y'
             # load the detection parameters From defaults so they can be actively updated
             self.obs = dict(obs)
         elif str(type(data)) == str(type(self)):
@@ -41,6 +42,7 @@ class sim_data:
             self.symmetry = str(data.symmetry)
             self.mirror_ax = str(data.mirror_ax)
             self.base_ax = str(data.base_ax)
+            self.free_ax = str(data.free_ax)
             self.obs = dict(data.obs)
         else:
             self.header = [h.lower() for h in headder]
@@ -55,6 +57,7 @@ class sim_data:
             self.symmetry = symmetry.lower()
             self.mirror_ax = mirroring.lower()
             self.base_ax = base[self.mirror_ax]
+            self.free_ax = 'y'
 
             # load the detection parameters From defaults so they can be actively updated
             self.obs = dict(obs)
@@ -94,7 +97,7 @@ class sim_data:
                             all_cts[stops] = all_cts[starts]
                         self.df['counts'] = all_cts
                 self.df['is_start'] = log_starts(self['ion n'])
-
+                self.free_ax = 'r'
             else:
                 # boot strappping so the other functions work when not in cylindrical
 

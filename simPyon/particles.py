@@ -196,6 +196,19 @@ class source:
         return((pdf('poisson',{lab:self.dist_vals[lab] for lab in ['c','b','k']}).sample(\
                         n,self['a1'],self['b1'])-self['b'])*self['fwhm']*self['direction']+self['mean'])
     
+
+    def filled_circle_pos_yz(self,n):
+        angs = np.random.rand(n)*(self.dist_vals['max_ang']-\
+                                  self.dist_vals['min_ang'])+\
+                                    self.dist_vals['min_ang']
+        rn = self.dist_vals['r']*np.sqrt(np.random.rand(n))
+        dy = np.cos(angs*np.pi/180)*rn
+        dz = np.sin(angs*np.pi/180)*rn
+        return(np.stack([np.ones(n)*self.dist_vals['origin'][0],
+                        dy+self.dist_vals['origin'][1],
+                        dz+self.dist_vals['origin'][2],
+                        ]).T)
+
     def __init__(self,dist_type='',dist_vals = {},n=1):
 
         func_dict = {'gaussian':self.gaussian,
@@ -215,7 +228,8 @@ class source:
                 'dependent_func':self.dependent_func,
                 'pdf':self.pdf,
                 'new':None,
-                'poisson':self.poisson}
+                'poisson':self.poisson,
+                'filled_circle_pos_yz':self.filled_circle_pos_yz,}
 
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
@@ -253,7 +267,11 @@ class source:
                                 'k':1,
                                 'fwhm':50,
                                 'mean':100,
-                                'direction':-1}
+                                'direction':-1},
+                'filled_circle_pos_yz':{'origin':np.array([0,0,0]),
+                                'r':10,
+                                'min_ang':0,
+                                'max_ang':360,}
 
                 }
 
@@ -353,6 +371,11 @@ class auto_parts:
         tof = self['tof'].dist_out
         x = pos[:,0]
         y = pos[:,1]
+        if pos.shape[1]==3:
+            z = pos[:,2]
+            print('sdfds')
+        else: 
+            z = np.zeros(len(x))
 
         if type(self.fil) == str:
             fils = [self.fil]
@@ -372,7 +395,7 @@ class auto_parts:
                     if np.sum(np.isnan(np.array([0,mass,charge,x[n],y[n],0,
                          az[n],el[n],ke[n],1,1])))==0:
                         fil.write("%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f \n"%\
-                            (tof[n],mass,charge,pos[n,0],pos[n,1],0,
+                            (tof[n],mass,charge,x[n],y[n],z[n],
                              az[n],el[n],ke[n],1,1))
                     else:
                         drop +=1
