@@ -209,6 +209,19 @@ class source:
                         dz+self.dist_vals['origin'][2],
                         ]).T)
 
+    def filled_donut_pos_yz(self,n):
+        angs = np.random.rand(n)*(self.dist_vals['max_ang']-\
+                                  self.dist_vals['min_ang'])+\
+                                    self.dist_vals['min_ang']
+        rnorm = self.dist_vals['r_min']/self.dist_vals['r_max']
+        rn = self.dist_vals['r_max']*np.sqrt(np.random.rand(n)*(1-rnorm**2)+rnorm**2)
+        dy = np.cos(angs*np.pi/180)*rn
+        dz = np.sin(angs*np.pi/180)*rn
+        return(np.stack([np.ones(n)*self.dist_vals['origin'][0],
+                        dy+self.dist_vals['origin'][1],
+                        dz+self.dist_vals['origin'][2],
+                        ]).T)
+
     def __init__(self,dist_type='',dist_vals = {},n=1):
 
         func_dict = {'gaussian':self.gaussian,
@@ -229,7 +242,8 @@ class source:
                 'pdf':self.pdf,
                 'new':None,
                 'poisson':self.poisson,
-                'filled_circle_pos_yz':self.filled_circle_pos_yz,}
+                'filled_circle_pos_yz':self.filled_circle_pos_yz,
+                'filled_donut_pos_yz':self.filled_donut_pos_yz}
 
         func_defaults  = {'gaussian':{'mean':0,'fwhm':1},
                 'uniform':{'min':0,'max':1},
@@ -270,6 +284,11 @@ class source:
                                 'direction':-1},
                 'filled_circle_pos_yz':{'origin':np.array([0,0,0]),
                                 'r':10,
+                                'min_ang':0,
+                                'max_ang':360,},
+                'filled_donut_pos_yz':{'origin':np.array([0,0,0]),
+                                'r_min':0,
+                                'r_max':10,
                                 'min_ang':0,
                                 'max_ang':360,}
 
