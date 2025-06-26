@@ -107,6 +107,16 @@ class pdf:
 
 
 class source:
+    '''
+
+    Parameters
+    ----------
+        dist_vals: dict, user defined function inputs 
+        dist_type: str
+        f: function
+        dist_out
+        n
+    '''
 
     def gaussian(self,n):
         return(np.random.normal(self.dist_vals['mean'],
@@ -332,8 +342,29 @@ class source:
 
 
 class auto_parts:
+    '''
+        Control structure defining paritcle distribution to be flown through simPyon.simion.fly function
+            - inspect source distribtions via self.df, 
+            - elements of self.df can be accessed and assigned via self['ke'] or self.df['ke'] 
+
+        Parameters
+        ----------
+            self.fil = fil
+            self.df = pd.Series({
+                      'n':n,
+                      'mass':MASS,
+                      'charge':CHARGE,
+                      'ke':source(str(KE_DIST_TYPE),n=n,dist_vals =KE_DIST_VALS.copy()),
+                      'az':source(str(AZ_DIST_TYPE),n=n,dist_vals = AZ_DIST_VALS.copy()),
+                      'el':source(str(EL_DIST_TYPE),n=n,dist_vals = EL_DIST_VALS.copy()),
+                      'pos':source(str(POS_DIST_TYPE),n=n,dist_vals = POS_DIST_VALS.copy()),
+                      'tof':source('single',n=n,dist_vals = {'value':0})})
+            self.params = {lab:n.dist_vals for lab,n in self.df.items() if type(n)==source}
+        '''
     
     def __init__(self, fil='auto_ion.ion', n=10000):
+        
+
         import pandas as pd
         self.fil = fil
         # distribution defaults
@@ -387,6 +418,7 @@ class auto_parts:
         pos = self['pos'].dist_out
         charge = self['charge']
         mass = self['mass']
+        print(self['mass'])
         tof = self['tof'].dist_out
         x = pos[:,0]
         y = pos[:,1]

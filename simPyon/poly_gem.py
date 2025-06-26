@@ -25,13 +25,18 @@ class gem_poly:
     def __init__(self, origin = np.array([0,0])):
         self.func_dict = {'box':self.box,
                           'clipbox':self.box,
+                          'centered_box3d':self.box,
                          'polyline':self.polygon,
                          'circle':self.circle}
 
         self.origin = origin
     def get_poly(self,dtype,verts):
         if dtype:
-            return(self.func_dict[dtype.lower()](verts))
+            if dtype in self.func_dict:
+                return(self.func_dict[dtype.lower()](verts))
+            else:
+                print('Warning: %s Not supported'%dtype) 
+                return()
         else:
             return()
 

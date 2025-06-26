@@ -98,10 +98,10 @@ class simion:
         import shutil
 
         def gem_checker(gemfil,home):
-            if os.path.exists(gm):
+            if os.path.exists(gemfil):
                 fil = gm
             else:
-                fil = os.path.join(home,gm)
+                fil = os.path.join(home,gemfil)
             return(fil)
 
         if gemfil =='':
